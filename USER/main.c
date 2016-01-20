@@ -85,6 +85,7 @@ void TaskStart(void * pdata) {
 //任务1-控制
 void TaskControl(void *pdata) {
 	while (1) {
+		LED1 = 0;
 		LED1 = 1;	 			 //	 也可以使用   GPIO_SetBits(GPIOD,GPIO_Pin_2);
 		OSTimeDlyHMSM(0,0,0,100);
 		LED1 = 0; 			 // 也可以使用	  GPIO_ResetBits(GPIOD,GPIO_Pin_2) ;
