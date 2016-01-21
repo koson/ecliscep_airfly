@@ -121,7 +121,7 @@ void OSInitHookEnd (void)
 */
 void OSTaskCreateHook (OS_TCB *ptcb)
 {
-    ptcb = ptcb;                       /* Prevent compiler warning                                     */
+//    ptcb = ptcb;                       /* Prevent compiler warning                                     */
 }
 
 
@@ -138,7 +138,7 @@ void OSTaskCreateHook (OS_TCB *ptcb)
 */
 void OSTaskDelHook (OS_TCB *ptcb)
 {
-    ptcb = ptcb;                       /* Prevent compiler warning                                     */
+//    ptcb = ptcb;                       /* Prevent compiler warning                                     */
 }
 
 /*
@@ -188,7 +188,7 @@ void OSTaskStatHook (void)
 #if OS_VERSION > 203
 void OSTCBInitHook (OS_TCB *ptcb)
 {
-    ptcb = ptcb;                                           /* Prevent Compiler warning                 */
+//    ptcb = ptcb;                                           /* Prevent Compiler warning                 */
 }
 #endif
 

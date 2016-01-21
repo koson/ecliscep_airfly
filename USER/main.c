@@ -53,12 +53,14 @@ int main(void) {
 	delay_init(72);	     //延时初始化
 	NVIC_Configuration();
 
-	uart_init(115200);	     //串口初始化，波特率115200
-	LED_Init();
+	uart1_init(115200);	     //串口初始化，波特率115200
+	uart2_init(115200);	     //串口初始化，波特率115200
 	printf("complier time:%s,%s\r\n", __DATE__, __TIME__);
 
-	Pwm_Cap_Init(0xffff, 72); //PWM捕获初始化,以1Mhz的频率计数
-	Pwm_Ouput_Init();                //初始化4路PWM输出 
+	LED_Init();
+
+//	Pwm_Cap_Init(0xffff, 72); //PWM捕获初始化,以1Mhz的频率计数
+//	Pwm_Ouput_Init();                //初始化4路PWM输出
 
 	OSInit();
 	OSTaskCreate(TaskStart,	//task pointer
@@ -72,7 +74,6 @@ int main(void) {
 
 //开始任务
 void TaskStart(void * pdata) {
-//	pdata = pdata; 	//
 	OS_ENTER_CRITICAL();
 	OSTaskCreate(TaskControl, (void *) 0,
 			(OS_STK *) &TASK_CONTROL_STK[CONTROL_STK_SIZE - 1],
@@ -84,11 +85,22 @@ void TaskStart(void * pdata) {
 
 //任务1-控制
 void TaskControl(void *pdata) {
+	u8 usart1_receive[200];
+	u8 usart1_re_len;
+
+	u8 usart2_receive[200];
+	u8 usart2_re_len;
+
 	while (1) {
-		LED1 = 1;	 			 //	 也可以使用   GPIO_SetBits(GPIOD,GPIO_Pin_2);
-		OSTimeDlyHMSM(0,0,0,100);
-		LED1 = 0; 			 // 也可以使用	  GPIO_ResetBits(GPIOD,GPIO_Pin_2) ;
-		OSTimeDlyHMSM(0,0,0,100);
+		LED1 = 1;
+		OSTimeDlyHMSM(0, 0, 0, 100);
+		LED1 = 0;
+		OSTimeDlyHMSM(0, 0, 0, 100);
+
+		USART1_Receive_Data(usart1_receive, &usart1_re_len);
+		USART2_Receive_Data(usart2_receive, &usart2_re_len);
+		Usart_Send_Data(USART2, usart1_receive, usart1_re_len);
+		Usart_Send_Data(USART1, usart2_receive, usart2_re_len);
 	}
 }
 

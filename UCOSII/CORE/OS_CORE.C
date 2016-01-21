@@ -818,7 +818,6 @@ void  OS_TaskIdle (void *pdata)
 #endif    
     
     
-    pdata = pdata;                               /* Prevent compiler warning for not using 'pdata'     */
     for (;;) {
         OS_ENTER_CRITICAL();
         OSIdleCtr++;
@@ -858,7 +857,6 @@ void  OS_TaskStat (void *pdata)
     INT8S      usage;
 
 
-    pdata = pdata;                               /* Prevent compiler warning for not using 'pdata'     */
     while (OSStatRdy == FALSE) {
         OSTimeDly(2 * OS_TICKS_PER_SEC);         /* Wait until statistic task is ready                 */
     }

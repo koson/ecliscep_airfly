@@ -22,6 +22,12 @@
 extern u8 USART_RX_BUF[64];     //接收缓冲,最大63个字节.末字节为换行符 
 extern u8 USART_RX_STA;         //接收状态标记	
 
-void uart_init(u32 bound);
+void uart1_init(u32 bound);
+void uart2_init(u32 bound);
+
+void Usart_Send_Data(USART_TypeDef* USARTx, u8 *buf, u8 len);
+
+void USART1_Receive_Data(u8 *buf, u8 *len);
+void USART2_Receive_Data(u8 *buf, u8 *len);
 
 #endif
