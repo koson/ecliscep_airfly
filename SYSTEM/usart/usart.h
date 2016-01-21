@@ -25,6 +25,7 @@ extern u8 USART_RX_STA;         //接收状态标记
 void uart1_init(u32 bound);
 void uart2_init(u32 bound);
 
+u8 Usart_Send_Byte(USART_TypeDef* USARTx, u8 data);
 void Usart_Send_Data(USART_TypeDef* USARTx, u8 *buf, u8 len);
 
 void USART1_Receive_Data(u8 *buf, u8 *len);

@@ -1,9 +1,3 @@
-#include "led.h"
-#include "delay.h"
-#include "sys.h"
-#include "usart.h"
-#include "stdio.h"
-#include "string.h"
 #include "includes.h"
 #include "board.h"
 
@@ -55,6 +49,7 @@ int main(void) {
 
 	uart1_init(115200);	     //串口初始化，波特率115200
 	uart2_init(115200);	     //串口初始化，波特率115200
+
 	printf("complier time:%s,%s\r\n", __DATE__, __TIME__);
 
 	LED_Init();
@@ -91,16 +86,29 @@ void TaskControl(void *pdata) {
 	u8 usart2_receive[200];
 	u8 usart2_re_len;
 
+//	Set_IPR115200();
+
 	while (1) {
+
 		LED1 = 1;
 		OSTimeDlyHMSM(0, 0, 0, 100);
 		LED1 = 0;
 		OSTimeDlyHMSM(0, 0, 0, 100);
 
-		USART1_Receive_Data(usart1_receive, &usart1_re_len);
+//		Set_IPR115200();
+//		Send_AT();
+
+		usart1_re_len = 0;
+		usart2_re_len = 0;
 		USART2_Receive_Data(usart2_receive, &usart2_re_len);
-		Usart_Send_Data(USART2, usart1_receive, usart1_re_len);
-		Usart_Send_Data(USART1, usart2_receive, usart2_re_len);
+		Sim5320_Receive_Data(usart1_receive, &usart1_re_len);
+		if (usart1_re_len>0) {
+			printf("%s \r\n",usart1_receive);
+		}
+		SendToGsm(usart2_receive,usart2_re_len);
+
+//		Usart_Send_Data(USART2, usart1_receive, usart1_re_len);
+//		Usart_Send_Data(USART1, usart2_receive, usart2_re_len);
 	}
 }
 

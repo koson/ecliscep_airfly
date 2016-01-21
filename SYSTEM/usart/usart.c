@@ -43,7 +43,6 @@ int fputc(int ch, FILE *f) {
 }
 #endif 
 
-
 const u16 UART1_MAX_RECEIVE_LEN = 200;
 u16 UART1_RX_CNT = 0;
 u8 UART1_RX_BUF[UART1_MAX_RECEIVE_LEN];  	//接收缓冲,最大64个字节.
@@ -145,7 +144,7 @@ void uart2_init(u32 bound) {
 	//Usart1 NVIC 配置
 	NVIC_InitStructure.NVIC_IRQChannel = USART2_IRQn;
 	NVIC_InitStructure.NVIC_IRQChannelPreemptionPriority = 3;
-	NVIC_InitStructure.NVIC_IRQChannelSubPriority = 4;		//
+	NVIC_InitStructure.NVIC_IRQChannelSubPriority = 3;		//
 	NVIC_InitStructure.NVIC_IRQChannelCmd = ENABLE;			//IRQ通道使能
 	NVIC_Init(&NVIC_InitStructure);	//根据NVIC_InitStruct中指定的参数初始化外设NVIC寄存器USART1
 
@@ -215,4 +214,19 @@ void Usart_Send_Data(USART_TypeDef* USARTx, u8 *buf, u8 len) {
 			;
 		UART2_RX_CNT = 0;
 	}
+}
+
+u8 Usart_Send_Byte(USART_TypeDef* USARTx, u8 data) {
+	if (USARTx == USART1) {
+		while (!(USART1->SR & USART_FLAG_TXE))
+			;
+		USART1->DR = (data & 0x1FF);
+	}
+
+	if (USARTx == USART2) {
+		while (!(USART2->SR & USART_FLAG_TXE))
+			;
+		USART2->DR = (data & 0x1FF);
+	}
+	return (data);
 }
