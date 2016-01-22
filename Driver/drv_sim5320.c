@@ -10,7 +10,13 @@
 #include "stdio.h"
 #include "string.h"
 
-u8 connect_flag = 0;
+struct {
+	float lat;
+
+} gps_info;
+
+u8 network_connect_flag = 0;
+u8 gps_flag = 0;
 
 u8 AT[] = "AT+"; //联机命令
 u8 ATE0[] = "ATE0"; //取消回显
@@ -427,7 +433,7 @@ void CONNECT_SEV(void) {
 		Sim5320_Receive_Data(receive_buf, &len);
 		p = mystrstr(receive_buf, "Connect ok");
 		if (p != NULL) {
-			connect_flag = 1;
+			network_connect_flag = 1;
 			printf("CONNECT_SEV Connect ok\r\n");
 			break;   //接收到"OK"
 		}
@@ -439,7 +445,7 @@ void Send_String_To_Server(char string[]) {
 	char cmd[50];
 	//测试10次，在某一次成功就退出
 
-	if (connect_flag == 0) {
+	if (network_connect_flag == 0) {
 		CONNECT_SEV();
 	} else {
 		while (i--) {
@@ -530,7 +536,86 @@ void Close_Network(void) {
 		Sim5320_Receive_Data(receive_buf, &len);
 		p = mystrstr(receive_buf, "Network closed");
 		if (p != NULL) {
+			network_connect_flag = 0;
 			printf("Close_Network Network closed\r\n");
+			break;   //接收到"OK"
+		}
+	}
+}
+
+/***********************开启GPS功能******************************
+ *功    能: 串口发送数组命令到SIM5320E， AT+CGPS=1
+ *形    参:
+ *返 回 值:
+ *备    注:
+ *****************************************************************/
+void Open_GPS(void) {
+	u8 *p, i = ATwaits, len; //
+	char cmd[50];
+	while (i--) //测试10次，在某一次成功就退出
+	{
+		CLR_RBUF();
+		sprintf(cmd, "AT+CGPS=1\r\n");
+		SendToGsm(cmd, strlen(cmd));
+		printf("Send to Sim5320:%s", cmd);
+		delay_ms(5000);
+		Sim5320_Receive_Data(receive_buf, &len);
+		p = mystrstr(receive_buf, "OK");
+		if (p != NULL) {
+			gps_flag = 1;
+			printf("Open_GPS OK\r\n");
+			break;   //接收到"OK"
+		}
+	}
+}
+
+/***********************关闭GPS功能******************************
+ *功    能: 串口发送数组命令到SIM5320E， AT+CGPS=0
+ *形    参:
+ *返 回 值:
+ *备    注:
+ *****************************************************************/
+void Close_GPS(void) {
+	u8 *p, i = ATwaits, len; //
+	char cmd[50];
+	while (i--) //测试10次，在某一次成功就退出
+	{
+		CLR_RBUF();
+		sprintf(cmd, "AT+CGPS=0\r\n");
+		SendToGsm(cmd, strlen(cmd));
+		printf("Send to Sim5320:%s", cmd);
+		delay_ms(5000);
+		Sim5320_Receive_Data(receive_buf, &len);
+		p = mystrstr(receive_buf, "OK");
+		if (p != NULL) {
+			gps_flag = 0;
+			printf("Close_GPS OK\r\n");
+			break;   //接收到"OK"
+		}
+	}
+}
+
+/***********************获取GPS信息******************************
+ *功    能: 串口发送数组命令到SIM5320E，AT+CGPSINFO
+ *形    参:
+ *返 回 值:
+ *备    注:
+ *****************************************************************/
+void Get_GPS_Info(char *info) {
+	u8 *p, i = ATwaits, len; //
+	char cmd[50];
+	while (i--) //测试10次，在某一次成功就退出
+	{
+		CLR_RBUF();
+		sprintf(cmd, "AT+CGPSINFO\r\n");
+		SendToGsm(cmd, strlen(cmd));
+		printf("Send to Sim5320:%s", cmd);
+		delay_ms(5000);
+		Sim5320_Receive_Data(receive_buf, &len);
+		p = mystrstr(receive_buf, "OK");
+		if (p != NULL) {
+			sprintf(info, "%s\r\n", receive_buf);
+			printf("Get_GPS_Info OK\r\n");
 			break;   //接收到"OK"
 		}
 	}
@@ -542,8 +627,12 @@ void Close_Network(void) {
  *返 回 值:
  *备    注:
  *****************************************************************/
-void GPRS_INT(void)
-{
+void GPRS_INT(void) {
+	delay_ms(5000);
+	delay_ms(5000);
+	delay_ms(5000);
+	delay_ms(5000);
+	delay_ms(5000);   //等待SIM5320硬件初始化
 //	Set_IPR115200();
 	Send_AT();		//AT联机测试
 	Send_ATE0();	//取消回显
@@ -551,6 +640,7 @@ void GPRS_INT(void)
 //	Set_MODE(1);	//设置短信格式文本
 	Check_Net_Register();		//查询网络注册
 	Check_Packet_Domain_Attach();
+	Open_GPS();
 	Set_APN();
 	OPEN_NET();
 	CONNECT_SEV();
@@ -566,6 +656,16 @@ void GPRS_INT(void)
  *返 回 值:
  *备    注:
  *****************************************************************/
-u8 Get_Connect_Flag(void){
-	return connect_flag;
+u8 Get_Connect_Flag(void) {
+	return network_connect_flag;
+}
+
+/*****************************************************
+ *功    能:GPS开启标志
+ *形    参:
+ *返 回 值:
+ *备    注:
+ *****************************************************************/
+u8 Get_Gps_Statue_Flag(void) {
+	return gps_flag;
 }
