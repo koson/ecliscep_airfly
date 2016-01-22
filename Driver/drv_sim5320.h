@@ -15,12 +15,14 @@
 #define   Sendwaits 5
 #define   SIM5320_USART USART1
 
-void SendToGsm(u8* p, u8 len);
+u8 *mystrstr(u8 *s, u8 *t);
+
+void SendToGsm(char* p, u8 len);
 void Set_IPR115200(void);
 void Sim5320_Receive_Data(u8 *buf, u8 *len);
 void Send_AT(void);
 void Send_ATE0(void);
-void ASK_CREG(void);
+void Check_Net_Register(void);
 void Set_MODE(u8 m);
 void Set_CNMI(void);
 void Set_CNMI(void);
@@ -29,10 +31,13 @@ void Set_IPR9600(void);
 void Set_IPR115200(void);
 void OPEN_NET(void);
 void CONNECT_SEV(void);
-void SEND_DATA10(void);
-void SEND_DATA3200(void);
 void CIPHEAD(void);
 void CIPSRIP(void);
-void TransmitText(u8 *dialnum, u8 *text);
+void Check_Packet_Domain_Attach(void);
+void Set_APN(void);
+void Send_String_To_Server(char string[]);
+void Close_Network(void);
+void GPRS_INT(void);
+u8 Get_Connect_Flag(void);
 
 #endif /* DRV_SIM5320_H_ */

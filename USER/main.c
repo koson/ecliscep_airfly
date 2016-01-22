@@ -53,6 +53,7 @@ int main(void) {
 	printf("complier time:%s,%s\r\n", __DATE__, __TIME__);
 
 	LED_Init();
+	GPRS_INT();
 
 //	Pwm_Cap_Init(0xffff, 72); //PWM捕获初始化,以1Mhz的频率计数
 //	Pwm_Ouput_Init();                //初始化4路PWM输出
@@ -85,30 +86,31 @@ void TaskControl(void *pdata) {
 
 	u8 usart2_receive[200];
 	u8 usart2_re_len;
-
-//	Set_IPR115200();
+	u8 *p;
 
 	while (1) {
 
 		LED1 = 1;
-		OSTimeDlyHMSM(0, 0, 0, 100);
+		OSTimeDlyHMSM(0, 0, 0, 500);
 		LED1 = 0;
-		OSTimeDlyHMSM(0, 0, 0, 100);
-
-//		Set_IPR115200();
-//		Send_AT();
+		OSTimeDlyHMSM(0, 0, 0, 500);
 
 		usart1_re_len = 0;
 		usart2_re_len = 0;
 		USART2_Receive_Data(usart2_receive, &usart2_re_len);
 		Sim5320_Receive_Data(usart1_receive, &usart1_re_len);
 		if (usart1_re_len>0) {
-			printf("%s \r\n",usart1_receive);
+			Usart_Send_Data(USART2,usart1_receive,usart1_re_len);
 		}
-		SendToGsm(usart2_receive,usart2_re_len);
-
-//		Usart_Send_Data(USART2, usart1_receive, usart1_re_len);
-//		Usart_Send_Data(USART1, usart2_receive, usart2_re_len);
+		p = mystrstr(usart2_receive, "exit");
+		if (p != NULL && Get_Connect_Flag()==1) {
+			Close_Network();
+		}
+		if (usart2_re_len>0 && Get_Connect_Flag()==1) {
+			Send_String_To_Server((char*)usart2_receive);
+		}if (Get_Connect_Flag()==0) {
+			CONNECT_SEV();
+		}
 	}
 }
 

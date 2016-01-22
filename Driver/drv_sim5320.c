@@ -8,6 +8,9 @@
 #include "usart.h"
 #include "delay.h"
 #include "stdio.h"
+#include "string.h"
+
+u8 connect_flag = 0;
 
 u8 AT[] = "AT+"; //联机命令
 u8 ATE0[] = "ATE0"; //取消回显
@@ -22,11 +25,11 @@ u8 MEG_CONST[] = "XI LAN HUA JI SHU ";  //短信内容
 u8 MSG_PHO[] = "18312666591";  //接收号码
 u8 IPR[] = "IPR=9600";  //修改波特率为9600
 u8 IPR1[] = "IPR=115200";  //修改波特率为115200
+u8 CGATT[] = "CGATT?";
 
 const u8 *modetbl[2] = { "TCP", "UDP" };  //
-const u8 port[] = "35286";	//
-u8 ipbuf[] = "220.170.79.231"; 	//IP
-const u8 PROT1[] = "80";	//PROT1
+const u8 port[] = "7015";	//
+u8 ipbuf[] = "120.27.100.18"; 	//IP
 
 const u8 MAX_RECEIVE_LEN = 200;
 u8 receive_buf[MAX_RECEIVE_LEN];
@@ -56,18 +59,11 @@ void CLR_RBUF(void) {
 /**************************************
  ** 函数功能 ：发送指定长度字符串到串口
  ** 函数说明 ：
- ** 入口参数 ：
+ ** 入口参数 ：字符串，字符长度
  ** 出口参数 ：
  **************************************/
-void SendToGsm(u8* p, u8 len) //字符串，字符长度
-{
-	Usart_Send_Data(SIM5320_USART, p, len);
-}
-
-//发送回车符,设置短消息模式 1 TEXT
-void Send_DA(void) {
-	Usart_Send_Byte(SIM5320_USART, 0x0D);
-	Usart_Send_Byte(SIM5320_USART, 0x0A);
+void SendToGsm(char* p, u8 len) {
+	Usart_Send_Data(SIM5320_USART, (u8*) p, len);
 }
 
 /***********************字符串查找********************************
@@ -107,16 +103,18 @@ u8 *mystrstr(u8 *s, u8 *t) {
  *****************************************************************/
 void Send_AT(void) {
 	u8 *p, i = ATwaits, len; //
-	while (i--) //测试10次，在某一次成功就退出
-	{
+	char cmd[50];
+	//测试10次，在某一次成功就退出
+	while (i--) {
 		CLR_RBUF();
-		SendToGsm(AT, 2);  //"AT"
-		Send_DA();  //回车符
-		delay_ms(300);
+		sprintf(cmd, "AT\r\n");
+		SendToGsm(cmd, strlen(cmd));
+		printf("Send to Sim5320:%s", cmd);
+		//等待应答"OK"
+		delay_ms(500);
 		Sim5320_Receive_Data(receive_buf, &len);
-		p = mystrstr(receive_buf, "OK");   //接收到的数据存在RsBuf
-		if (p != NULL) //接收到"OK"
-		{
+		p = mystrstr(receive_buf, "OK");
+		if (p != NULL) {
 			printf("Send_AT Reiceive OK\r\n");
 			break;
 		}
@@ -124,126 +122,145 @@ void Send_AT(void) {
 }
 
 /***********************发送取消回显指令******************************
- *功    能: 串口发送数组命令到TC35，"AT0",
+ *功    能: 串口发送数组命令到SIM5320，ATE0
  *形    参:
  *返 回 值:
  *备    注: 设置无回显功能
  *****************************************************************/
 void Send_ATE0(void) {
 	u8 *p, i = ATwaits, len; //
-
-	while (i--) //测试10次，在某一次成功就退出
-	{
+	char cmd[50];
+	//测试10次，在某一次成功就退出
+	while (i--) {
 		CLR_RBUF();
-		//清串口1数据缓冲区
-		// 本来只有\r 我添加的\n 后来证明 可以不加的
-		SendToGsm(ATE0, 4);    //"AT"
-		Send_DA();    //回车符
-		delay_ms(400);
+		sprintf(cmd, "%s\r\n", ATE0);
+		SendToGsm(cmd, strlen(cmd));
+		printf("Send to Sim5320:%s", cmd);
+		//等待应答"OK"
+		delay_ms(500);
 		Sim5320_Receive_Data(receive_buf, &len);
-		p = mystrstr(receive_buf, "OK");   //接收到的数据存在sci1_rbuf
-		if (p != NULL)
+		p = mystrstr(receive_buf, "OK");
+		if (p != NULL) {
 			printf("Send_ATE0 Reiceive OK\r\n");
-		break;   //接收到"OK"
+			break;
+		}
 	}
 }
 
 /***********************网络注册状态******************************
- *功    能: 串口发送数组命令到TC35，"AT+CREG?",
+ *功    能: 串口发送数组命令到SIM5320，"AT+CREG?",
  *形    参:
  *返 回 值:
  *备    注: 查询网络注册状+CREG: 0,2//没注册 +CREG: 0,1//注册上了
  *****************************************************************/
-void ASK_CREG(void) {
-	u8 i = 20, len; //
-	while (i--) //测试10次，在某一次成功就退出
-	{
-
+void Check_Net_Register(void) {
+	u8 *p, i = 20, len; //
+	char cmd[50];
+	//测试10次，在某一次成功就退出
+	while (i--) {
 		CLR_RBUF();
-		SendToGsm(AT, 3);    //"AT"
-		SendToGsm(Creg_Mes, 5);    //"AT+CREG?"
-		Send_DA();    //回车符
-		delay_ms(800);
+		sprintf(cmd, "%s%s\r\n", AT, Creg_Mes);
+		SendToGsm(cmd, strlen(cmd));
+		printf("Send to Sim5320:%s", cmd);
+		//等待应答"OK"
+		delay_ms(500);
 		Sim5320_Receive_Data(receive_buf, &len);
-		//表示注册上了网络31注册本地网 35注册漫游
-		if ((receive_buf[11] == 0x31) | (receive_buf[11] == 0x35)) {
-			CLR_RBUF();
-			printf("ASK_CREG Reiceive OK\r\n");
-			break; //接收到"OK"
+		p = mystrstr(receive_buf, "OK");
+		if (p != NULL) {
+			printf("Send_ATE0 Reiceive OK\r\n");
+			p = mystrstr(receive_buf, "+CREG: 0,1");
+			if (p != NULL) {
+				printf("sim has register\r\n");
+			}
+			p = mystrstr(receive_buf, "+CREG: 0,2");
+			if (p != NULL) {
+				printf("sim not register\r\n");
+			}
+			break;
 		}
 	}
 }
 
 /***********************设置短消息模式******************************
- *功    能: 串口发送数组命令到TC35，AT+CMGF=1
+ *功    能: 串口发送数组命令到SIM5320，AT+CMGF=1 or AT+CMGF=0
  *形    参:    uchar m =1 text模式      m=0 PDU模式
  *返 回 值:
  *备    注:    1 TEXT
  *****************************************************************/
 void Set_MODE(u8 m) {
 	u8 *p, i = ATwaits, len; //
-
-	while (i--) //测试10次，在某一次成功就退出
-	{
+	char cmd[50];
+	//测试10次，在某一次成功就退出
+	while (i--) {
 		CLR_RBUF();
 		if (m) {
-			SendToGsm(AT, 3);    //"AT"
-			SendToGsm(TxtMode, 6);    //"AT"
-			Send_DA();    //回车符 //设置短消息模式 1 TEXT
+			sprintf(cmd, "%s%s\r\n", AT, TxtMode);
+			SendToGsm(cmd, strlen(cmd));
 		} else {
-			SendToGsm(AT, 3);
-			SendToGsm(PDUMode, 6);
-			Send_DA();    //回车符 //设置短消息模式 0  PDU模式
+			sprintf(cmd, "%s%s\r\n", AT, PDUMode);
+			SendToGsm(cmd, strlen(cmd));
 		}
-		//****************************等待应答"OK"
-		delay_ms(400);
+		printf("Send to Sim5320:%s", cmd);
+		//等待应答"OK"
+		delay_ms(500);
 		Sim5320_Receive_Data(receive_buf, &len);
-		p = mystrstr(receive_buf, "OK");   //接收到的数据存在sci1_rbuf
+		p = mystrstr(receive_buf, "OK");
 		if (p != NULL) {
 			printf("Set_MODE Reiceive OK\r\n");
-			break;   //接收到"OK"
+			break;
 		}
 	}
+
 }
+
+/***********************设置短消息模式******************************
+ *功    能: 串口发送数组命令到SIM5320，接收消息  AT+CNMI=2,1
+ *形    参:
+ *返 回 值:
+ *备    注:
+ *****************************************************************/
 void Set_CNMI(void) {
 	u8 *p, i = ATwaits, len; //
-
-	while (i--) //测试10次，在某一次成功就退出
-	{
+	char cmd[50];
+	//测试10次，在某一次成功就退出
+	while (i--) {
 		CLR_RBUF();
-		//清串口1数据缓冲区
-		SendToGsm(AT, 3);    //"AT+"
-		SendToGsm(IND_Mes, 8);    //CMTI=1，2
-		Send_DA();    //回车符//设置短信提示
-		//****************************等待应答"OK"
-		delay_ms(200);
+		sprintf(cmd, "%s%s\r\n", AT, IND_Mes);
+		SendToGsm(cmd, strlen(cmd));
+		printf("Send to Sim5320:%s", cmd);
+		//等待应答"OK"
+		delay_ms(500);
 		Sim5320_Receive_Data(receive_buf, &len);
-		p = mystrstr(receive_buf, "OK");   //接收到的数据存在sci1_rbuf
+		p = mystrstr(receive_buf, "OK");
 		if (p != NULL) {
 			printf("Set_CNMI Reiceive OK\r\n");
-			break;   //接收到"OK"
+			break;
 		}
 	}
 }
 
+/***********************设置短消息模式******************************
+ *功    能: 串口发送数组命令到SIM5320，消除第一个位置消息  AT+CMGD=1
+ *形    参:
+ *返 回 值:
+ *备    注:
+ *****************************************************************/
 void Set_CMGD(void) {
 	u8 *p, i = ATwaits, len; //
-
-	while (i--) //测试10次，在某一次成功就退出
-	{
+	char cmd[50];
+	//测试10次，在某一次成功就退出
+	while (i--) {
 		CLR_RBUF();
-		//清串口1数据缓冲区
-		SendToGsm(AT, 3);    //"AT+"
-		SendToGsm(clear_Mes, 6);    //CMGD=1
-		Send_DA();    //回车符//设置短信提示
-		//****************************等待应答"OK"
-		delay_ms(200);
+		sprintf(cmd, "%s%s\r\n", AT, clear_Mes);
+		SendToGsm(cmd, strlen(cmd));
+		printf("Send to Sim5320:%s", cmd);
+		//等待应答"OK"
+		delay_ms(500);
 		Sim5320_Receive_Data(receive_buf, &len);
-		p = mystrstr(receive_buf, "OK");   //接收到的数据存在sci1_rbuf
+		p = mystrstr(receive_buf, "OK");
 		if (p != NULL) {
 			printf("Set_CMGD Reiceive OK\r\n");
-			CLR_RBUF();
-			break;   //接收到"OK"
+			break;
 		}
 	}
 }
@@ -255,44 +272,44 @@ void Set_CMGD(void) {
  *备    注:
  *****************************************************************/
 void Set_IPR9600(void) {
-	u8 *p, i = ATwaits, len; //
-
-	while (i--) //测试10次，在某一次成功就退出
-	{
+	u8 *p, i = ATwaits, len;
+	char cmd[50];
+	//测试10次，在某一次成功就退出
+	while (i--) {
 		CLR_RBUF();
-		SendToGsm(AT, 3);    //"AT+"
-		SendToGsm(IPR, 8);    //"CGPSIPR=9600"	如果改为115200 为14个字符
-		Send_DA();    //回车符//设置短消息模式 1 TEXT
-		//****************************等待应答"OK"
-		delay_ms(200);
+		sprintf(cmd, "%s%s\r\n", AT, IPR);
+		SendToGsm(cmd, strlen(cmd));
+		printf("Send to Sim5320:%s", cmd);
+		//等待应答"OK"
+		delay_ms(500);
 		Sim5320_Receive_Data(receive_buf, &len);
-		p = mystrstr(receive_buf, "OK");   //接收到的数据存在sci1_rbuf
+		p = mystrstr(receive_buf, "OK");
 		if (p != NULL) {
 			printf("Set_IPR9600 Reiceive OK\r\n");
-			break;   //接收到"OK"
+			break;
 		}
 	}
 }
 
 /***********************波特率设置******************************
- *功    能: 串口发送数组命令到SIM5320E，AT+IPR=9600
+ *功    能: 串口发送数组命令到SIM5320E，AT+IPR=115200
  *形    参:
  *返 回 值:
  *备    注:
  *****************************************************************/
 void Set_IPR115200(void) {
 	u8 *p, i = ATwaits, len;
-
-	while (i--) //测试10次，在某一次成功就退出
-	{
+	char cmd[50];
+	//测试10次，在某一次成功就退出
+	while (i--) {
 		CLR_RBUF();
-		SendToGsm(AT, 3);    //"AT+"
-		SendToGsm(IPR1, 14);    //"CGPSIPR=9600"	如果改为115200 为14个字符
-		Send_DA();    //回车符//设置短消息模式 1 TEXT
-		//****************************等待应答"OK"
-		delay_ms(200);
+		sprintf(cmd, "%s%s\r\n", AT, IPR1);
+		SendToGsm(cmd, strlen(cmd));
+		printf("Send to Sim5320:%s", cmd);
+		//等待应答"OK"
+		delay_ms(2000);
 		Sim5320_Receive_Data(receive_buf, &len);
-		p = mystrstr(receive_buf, "OK");   //接收到的数据存在sci1_rbuf
+		p = mystrstr(receive_buf, "OK");
 		if (p != NULL) {
 			printf("Set_IPR115200 Reiceive OK\r\n");
 			break;
@@ -300,117 +317,146 @@ void Set_IPR115200(void) {
 	}
 }
 
+/***********************查看附着GPRS情况******************************
+ *功    能: 串口发送数组命令到SIM5320E，AT+CGATT?
+ *形    参:
+ *返 回 值:+CGATT: 1 //已注册
+ *备    注:
+ *****************************************************************/
+void Check_Packet_Domain_Attach(void) {
+	u8 *p, i = ATwaits, len;
+	char cmd[50];
+	//测试10次，在某一次成功就退出
+	while (i--) {
+		CLR_RBUF();
+		sprintf(cmd, "%s%s\r\n", AT, CGATT);
+		SendToGsm(cmd, strlen(cmd));
+		printf("Send to Sim5320:%s", cmd);
+		//等待应答"OK"
+		delay_ms(500);
+		Sim5320_Receive_Data(receive_buf, &len);
+		p = mystrstr(receive_buf, "OK");
+		if (p != NULL) {
+			printf("Set_IPR115200 Reiceive OK\r\n");
+			p = mystrstr(receive_buf, "+CGATT: 1");
+			if (p != NULL) {
+				printf("sim net has register\r\n");
+			}
+			p = mystrstr(receive_buf, "+CGATT: 0");
+			if (p != NULL) {
+				printf("sim net not register\r\n");
+			}
+			break;
+		}
+	}
+}
+
+/***********************设置APN****************************
+ *功    能: 串口发送数组命令到SIM5320E， AT+CGSOCKCONT=1,"IP","3gnet"
+ *形    参:
+ *返 回 值:
+ *备    注:
+ *****************************************************************/
+void Set_APN(void) {
+	u8 *p, i = ATwaits, len; //
+	char cmd[50];
+	while (i--) //测试10次，在某一次成功就退出
+	{
+		CLR_RBUF();
+		sprintf(cmd, "AT+CGSOCKCONT=1,\"IP\",\"3gnet\"\r\n");
+		SendToGsm(cmd, strlen(cmd));
+		printf("Send to Sim5320:%s", cmd);
+		//等待应答"OK"
+		delay_ms(5000);
+		Sim5320_Receive_Data(receive_buf, &len);
+		p = mystrstr(receive_buf, "OK");
+		if (p != NULL) {
+			printf("Set_APN Reiceive OK\r\n");
+			break;   //接收到"OK"
+		}
+	}
+}
+
 /***********************打开网络******************************
- *功    能: 串口发送数组命令到SIM5320E， OPNET[]="NETOPEN="TCP",80";//打开网络
+ *功    能: 串口发送数组命令到SIM5320E， OPNET[]="NETOPEN="TCP",56302;//打开网络
  *形    参:
  *返 回 值:
  *备    注:
  *****************************************************************/
 void OPEN_NET(void) {
 	u8 *p, i = ATwaits, len; //
-
+	char cmd[50];
 	while (i--) //测试10次，在某一次成功就退出
 	{
 		CLR_RBUF();
-		//清串口1数据缓冲区
-		SendToGsm(AT, 3);    //"AT+"
-//	 SendToGsm(OPNET,16);    //"CGPSIPR=9600"	如果改为115200 为14个字符
-		printf("NETOPEN=\"%s\",%s", modetbl[0], PROT1);
-		Send_DA();    //回车符//设置短消息模式 1 TEXT
-		//****************************等待应答"OK"
-		delay_ms(200);
+		sprintf(cmd, "AT+NETOPEN=\"%s\",%s\r\n", modetbl[0], port);
+		SendToGsm(cmd, strlen(cmd));
+		printf("Send to Sim5320:%s", cmd);
+		delay_ms(5000);
 		Sim5320_Receive_Data(receive_buf, &len);
-		p = mystrstr(receive_buf, "OK");   //接收到的数据存在sci1_rbuf
+		p = mystrstr(receive_buf, "Network opened");
 		if (p != NULL) {
-			printf("OPEN_NET Reiceive OK\r\n");
-			break;   //接收到"OK"
+			printf("OPEN_NET Network opened\r\n");
+			break;
+		}
+		p = mystrstr(receive_buf, "Network is already opened");
+		if (p != NULL) {
+			printf("OPEN_NET Network is already opened\r\n");
+			break;
 		}
 	}
 }
 
 /***********************链接服务器******************************
- *功    能: 串口发送数组命令到SIM5320E，  TCPCONNEXT[]="TCPCONNECT="220.170.79.231",56302";//链接服务器
+ *功    能: 串口发送数组命令到SIM5320E， AT+TCPCONNECT="220.170.79.231",56302;//链接服务器
  *形    参:
  *返 回 值:
  *备    注:
  *****************************************************************/
 void CONNECT_SEV(void) {
 	u8 *p, i = ATwaits, len; //
-
+	char cmd[50];
 	while (i--) //测试10次，在某一次成功就退出
 	{
 		CLR_RBUF();
-		//清串口1数据缓冲区
-		// 本来只有\r 我添加的\n 后来证明 可以不加的
-//	 SendToGsm(AT,3);    //"AT+"
-		//SendToGsm(TCPCONNEXT,33);    //
-		printf("AT+TCPCONNECT=\"%s\",%s", ipbuf, port);
-		Send_DA();	 //回车符//设置短消息模式 1 TEXT
-		//****************************等待应答"OK"
-		delay_ms(200);
+		sprintf(cmd, "AT+TCPCONNECT=\"%s\",%s\r\n", ipbuf, port);
+		SendToGsm(cmd, strlen(cmd));
+		printf("Send to Sim5320:%s", cmd);
+		delay_ms(5000);
+		delay_ms(5000);
 		Sim5320_Receive_Data(receive_buf, &len);
-		p = mystrstr(receive_buf, "OK");   //接收到的数据存在sci1_rbuf
+		p = mystrstr(receive_buf, "Connect ok");
 		if (p != NULL) {
-			printf("CONNECT_SEV Reiceive OK\r\n");
+			connect_flag = 1;
+			printf("CONNECT_SEV Connect ok\r\n");
 			break;   //接收到"OK"
 		}
 	}
 }
 
-/***********************发送10个字节数据*****************************
- *功    能: 串口发送数组命令到SIM5320E，  TCPWRITE[]="TCPWRITE=10";//发送数据
- *形    参:
- *返 回 值:
- *备    注:
- *****************************************************************/
-void SEND_DATA10(void) {
-	u8 *p, i = ATwaits, len; //
+void Send_String_To_Server(char string[]) {
+	u8 *p, i = ATwaits, len;
+	char cmd[50];
+	//测试10次，在某一次成功就退出
 
-	while (i--) //测试10次，在某一次成功就退出
-	{
-		CLR_RBUF();
-		//清串口1数据缓冲区
-		// 本来只有\r 我添加的\n 后来证明 可以不加的
-		SendToGsm(AT, 3);    //"AT+"
-		//SendToGsm(TCPWRITE,11);    //
-		printf("TCPWRITE=10");
-		Send_DA();	 //回车符//设置短消息模式 1 TEXT
-		//****************************等待应答"OK"
-		delay_ms(10000);
-		Sim5320_Receive_Data(receive_buf, &len);
-		p = mystrstr(receive_buf, "OK");   //接收到的数据存在sci1_rbuf
-		if (p != NULL) {
-			printf("SEND_DATA10 Reiceive OK\r\n");
-			break;   //接收到"OK"
-		}
-	}
-}
-
-/***********************发送3200个字节数据*****************************
- *功    能: 串口发送数组命令到SIM5320E，  TCPWRITE[]="TCPWRITE=10";//发送数据
- *形    参:
- *返 回 值:
- *备    注:
- *****************************************************************/
-void SEND_DATA3200(void) {
-	u8 *p, i = ATwaits, len; //
-
-	while (i--) //测试10次，在某一次成功就退出
-	{
-		CLR_RBUF();
-		//清串口1数据缓冲区
-		// 本来只有\r 我添加的\n 后来证明 可以不加的
-		SendToGsm(AT, 3);    //"AT+"
-		//SendToGsm(TCPWRITE,11);    //
-		printf("TCPWRITE=3200");
-		Send_DA();	 //回车符//设置短消息模式 1 TEXT
-		//****************************等待应答"OK"
-		delay_ms(10000);
-		Sim5320_Receive_Data(receive_buf, &len);
-		p = mystrstr(receive_buf, "OK");   //接收到的数据存在sci1_rbuf
-		if (p != NULL) {
-			printf("SEND_DATA3200 Reiceive OK\r\n");
-			break;   //接收到"OK"
+	if (connect_flag == 0) {
+		CONNECT_SEV();
+	} else {
+		while (i--) {
+			CLR_RBUF();
+			sprintf(cmd, "%sTCPWRITE=%d\r\n", AT, strlen(string));
+			SendToGsm(cmd, strlen(cmd));
+			printf("Send to Sim5320:%s", cmd);
+			delay_ms(2000);
+			SendToGsm(string, strlen(string));
+			printf("Send to Sim5320:%s", string);
+			delay_ms(5000);
+			Sim5320_Receive_Data(receive_buf, &len);
+			p = mystrstr(receive_buf, "Send ok");
+			if (p != NULL) {
+				printf("Send_String_To_Server Reiceive OK\r\n");
+				break;   //接收到"OK"
+			}
 		}
 	}
 }
@@ -423,20 +469,16 @@ void SEND_DATA3200(void) {
  *****************************************************************/
 void CIPHEAD(void) {
 	u8 *p, i = ATwaits, len; //
-
-	while (i--) //测试10次，在某一次成功就退出
-	{
+	char cmd[50];
+	//测试10次，在某一次成功就退出
+	while (i--) {
 		CLR_RBUF();
-		//清串口1数据缓冲区
-		// 本来只有\r 我添加的\n 后来证明 可以不加的
-		SendToGsm(AT, 3);    //"AT+"
-		//SendToGsm(CIPHEAD,9);    //
-		printf("CIPHEAD=0");
-		Send_DA();	 //回车符//设置短消息模式 1 TEXT
-		//****************************等待应答"OK"
-		delay_ms(200);
+		sprintf(cmd, "%sCIPHEAD=0\r\n", AT);
+		SendToGsm(cmd, strlen(cmd));
+		printf("Send to Sim5320:%s", cmd);
+		delay_ms(2000);
 		Sim5320_Receive_Data(receive_buf, &len);
-		p = mystrstr(receive_buf, "OK");   //接收到的数据存在sci1_rbuf
+		p = mystrstr(receive_buf, "OK");
 		if (p != NULL) {
 			printf("CIPHEAD Reiceive OK\r\n");
 			break;   //接收到"OK"
@@ -452,129 +494,78 @@ void CIPHEAD(void) {
  *****************************************************************/
 void CIPSRIP(void) {
 	u8 *p, i = ATwaits, len; //
-
-	while (i--) //测试10次，在某一次成功就退出
-	{
+	char cmd[50];
+	//测试10次，在某一次成功就退出
+	while (i--) {
 		CLR_RBUF();
-		//清串口1数据缓冲区
-		// 本来只有\r 我添加的\n 后来证明 可以不加的
-		SendToGsm(AT, 3);    //"AT+"
-		//SendToGsm(CIPSRIP,9);    //
-		printf("CIPSRIP=0");
-		Send_DA();	 //回车符//设置短消息模式 1 TEXT
-		//****************************等待应答"OK"
-		delay_ms(200);
+		sprintf(cmd, "%sCIPSRIP=0\r\n", AT);
+		SendToGsm(cmd, strlen(cmd));
+		printf("Send to Sim5320:%s", cmd);
+		delay_ms(2000);
 		Sim5320_Receive_Data(receive_buf, &len);
-		p = mystrstr(receive_buf, "OK");   //接收到的数据存在sci1_rbuf
+		p = mystrstr(receive_buf, "OK");
 		if (p != NULL) {
-			printf("CIPHEAD Reiceive OK\r\n");
+			printf("CIPSRIP Reiceive OK\r\n");
 			break;   //接收到"OK"
 		}
 	}
 }
 
-/***********************发送TEXT短信息********************************
- *功    能: TEXT模式发送短信息
- *形    参: char *dialnum 目的号码13512345678    char *text发送内容
- *返 回 值: 无   SEND_OK=1;//发送成功
- *备    注:发送TEXT短信息 之前应该先 1，设置短消息模式   AT+CMGF=? (0)=PDU (1)=TEXT
- 声明： 2，设置短消息中心     AT+CSCA=“+8613800531500”此内容无需设置
-
+/***********************关闭网络连接******************************
+ *功    能: 串口发送数组命令到SIM5320E， AT+NETCLOSE
+ *形    参:
+ *返 回 值:
+ *备    注:
  *****************************************************************/
-void TransmitText(u8 *dialnum, u8 *text)   //发送号码 发送内容，字母或数字
-{
-	u8 i = Sendwaits, j = Sendwaits, len;
-	u8 *p;   //temp 求异或
-
-	CLR_RBUF();
-	SendToGsm(AT, 3);    //"AT+"
-	SendToGsm(Send_Mes, 5);    //"CMGS="
-	Usart_Send_Byte(SIM5320_USART, '"'); //设置短消息模式 1 TEXT
-	SendToGsm(dialnum, 11); //"CMGS="SendString(Dialnum);   //手机号码的引号丢了！！！！！！！！！ 已经加上
-	Usart_Send_Byte(SIM5320_USART, '"');
-
-	Send_DA();    //回车符  //发送回车指令//
-	while (i--) {
-		delay_ms(400);
+void Close_Network(void) {
+	u8 *p, i = ATwaits, len; //
+	char cmd[50];
+	while (i--) //测试10次，在某一次成功就退出
+	{
+		CLR_RBUF();
+		sprintf(cmd, "AT+NETCLOSE\r\n");
+		SendToGsm(cmd, strlen(cmd));
+		printf("Send to Sim5320:%s", cmd);
+		delay_ms(5000);
 		Sim5320_Receive_Data(receive_buf, &len);
-		p = mystrstr(receive_buf, "OK");   //接收到的数据存在sci1_rbuf
-		if (p != NULL) //如果接受到 > 发送text
-		{
-			///////Get">"////////////////////////////
-			CLR_RBUF(); //清空接收缓冲区
-			//发送内容
-			//数据
-			SendToGsm(text, 18);	 //总计数据个数 次数*个数11
-			Usart_Send_Byte(SIM5320_USART, '\x1a');	//'\x1a'结束符(相当CTRL+Z) '\r'回车符
-			Send_DA();	 //回车符   //发送回车指令//
-			//delayms_100ms();
-			while (j--) {
-				delay_ms(1200);
-				Sim5320_Receive_Data(receive_buf, &len);
-				p = mystrstr(receive_buf, "OK");
-				if (p != NULL) {
-					CLR_RBUF();
-					printf("TX MESSEAGE OK\r\n");
-					break;
-				}
-			}
+		p = mystrstr(receive_buf, "Network closed");
+		if (p != NULL) {
+			printf("Close_Network Network closed\r\n");
+			break;   //接收到"OK"
 		}
 	}
 }
 
-void GPRS_INT(void)			//GPRS初始化
+/***********************GPRS初始化******************************
+ *功    能:
+ *形    参:
+ *返 回 值:
+ *备    注:
+ *****************************************************************/
+void GPRS_INT(void)
 {
-	Set_IPR115200();
-	delay_ms(500);
-	delay_ms(500);
-	delay_ms(500);
-	delay_ms(500);
-	delay_ms(500);
-	delay_ms(500);
-	delay_ms(500);
-	delay_ms(500);
-	delay_ms(500);
-	delay_ms(500);
-	Send_AT();			//AT联机测试
-	delay_ms(200);
-	delay_ms(200);
-	delay_ms(200);
-	delay_ms(200);
-	//取消回显
-	Send_ATE0();
-	delay_ms(200);
-	delay_ms(200);
-	delay_ms(200);
-	delay_ms(200);
-	delay_ms(200);
-	//設置短信提示
-	Set_CNMI();
-	//设置短信格式
-	Set_MODE(1);			//文本
-	delay_ms(200);
-	delay_ms(200);
-	delay_ms(200);
-	delay_ms(200);
-	delay_ms(200);
-	//第三步：查询信号有信号才可以发短信
-	ASK_CREG();
-	delay_ms(200);
-	delay_ms(200);
-	delay_ms(200);
-	delay_ms(200);
-	delay_ms(200);
+//	Set_IPR115200();
+	Send_AT();		//AT联机测试
+	Send_ATE0();	//取消回显
+//	Set_CNMI();		//設置短信提示
+//	Set_MODE(1);	//设置短信格式文本
+	Check_Net_Register();		//查询网络注册
+	Check_Packet_Domain_Attach();
+	Set_APN();
+	OPEN_NET();
+	CONNECT_SEV();
+	CIPHEAD();
+	CIPSRIP();
+//	delay_ms(200);
+//	Send_String_To_Server("this is a test message");
 }
 
-void GPRS_TEST(void) {
-
-	OPEN_NET();
-	delay_ms(200);
-	CONNECT_SEV();
-	delay_ms(200);
-	CIPHEAD();
-	delay_ms(200);
-	CIPSRIP();
-	SEND_DATA10();
-	delay_ms(200);
-	// printf("发送图片吧");
+/*****************************************************
+ *功    能:获取网络连接状态
+ *形    参:
+ *返 回 值:
+ *备    注:
+ *****************************************************************/
+u8 Get_Connect_Flag(void){
+	return connect_flag;
 }
