@@ -7,16 +7,32 @@
 #include "drv_sim5320.h"
 #include "usart.h"
 #include "delay.h"
-#include "stdio.h"
 #include "string.h"
 
-struct {
-	float lat;
+#define DEBUG
 
+//GSM设置
+#define   AT_CMD_REPEAT_TIMES  10 //等待回复时间
+struct GPS_INFO {
+	float lat; //经度
+	/*0 - north, 1 - south*/
+	u8 NS_Indicator; //南北方向
+	float log; //续度
+	/*0 - east, 1 - west*/
+	u8 EW_Indicator; //东西方向
+	u16 date; //Date. Output format is ddmmyy
+	float UTCtime; //UTC Time. Output format is hhmmss.s
+	float alt; //MSL Altitude. Unit is meters.
+	float speed; //Speed Over Ground. Unit is knots.
+	float course; //Course. Degrees
+	u8 time; //range is 0-255, unit is second, after set <time> will report the GPS information every the seconds.
 } gps_info;
 
-u8 network_connect_flag = 0;
-u8 gps_flag = 0;
+/*0-未连接，1-已连接*/
+u8 network_connect_flag = 0; //GPRS连接状态
+
+/*0-未打开，1-已打开*/
+u8 gps_flag = 0; //GPS开启/关闭状态
 
 u8 AT[] = "AT+"; //联机命令
 u8 ATE0[] = "ATE0"; //取消回显
@@ -32,16 +48,12 @@ u8 MSG_PHO[] = "18312666591";  //接收号码
 u8 IPR[] = "IPR=9600";  //修改波特率为9600
 u8 IPR1[] = "IPR=115200";  //修改波特率为115200
 u8 CGATT[] = "CGATT?";
-
 const u8 *modetbl[2] = { "TCP", "UDP" };  //
 const u8 port[] = "7015";	//
 u8 ipbuf[] = "120.27.100.18"; 	//IP
 
 const u8 MAX_RECEIVE_LEN = 200;
 u8 receive_buf[MAX_RECEIVE_LEN];
-u8 receive_buf_counter = 0;        //串口1接收缓冲区指针
-u8 receive_buf_start = 0;          //串口1接收缓冲区起始位
-u8 receive_buf_end = 0;            //串口1接收缓冲区结束位
 
 void Sim5320_Receive_Data(u8 *buf, u8 *len) {
 	USART1_Receive_Data(buf, len);
@@ -58,8 +70,6 @@ void CLR_RBUF(void) {
 	for (i = 0; i < MAX_RECEIVE_LEN; i++) {
 		receive_buf[i] = 0x00;
 	}
-	receive_buf_counter = 0;
-	receive_buf_start = 0;
 }
 
 /**************************************
@@ -72,33 +82,31 @@ void SendToGsm(char* p, u8 len) {
 	Usart_Send_Data(SIM5320_USART, (u8*) p, len);
 }
 
-/***********************字符串查找********************************
- *功    能: 查找字符串
- *形    参: char *s, char *t ;在s中查找t
- *返 回 值: s_temp(t在s中的位置)成功     0 （失败 ）
- *备    注:
- *****************************************************************/
-u8 *mystrstr(u8 *s, u8 *t) {
-	u8 *s_temp; /*the s_temp point to the s*/
-	u8 *m_temp; /*the mv_tmp used to move in the loop*/
-	u8 *t_temp; /*point to the pattern string*/
-
-	if (NULL == s || NULL == t)
-		return NULL;
-
-	/*s_temp point to the s string*/
-	for (s_temp = s; *s_temp != '\0'; s_temp++) {
-		/*the move_tmp used for pattern loop*/
-		m_temp = s_temp;
-		/*the pattern string loop from head every time*/
-		for (t_temp = t; *t_temp == *m_temp; t_temp++, m_temp++)
-			;
-		/*if at the tail of the pattern string return s_tmp*/
-		if (*t_temp == '\0')
-			return s_temp;
-
+/**
+ * @Description: 发送指定到SIM5320
+ * @param cmd:命令字符串, answer:期待回复字符串
+ * @return 0-发送失败，1-发送成功
+ * @author Sujunqin
+ */
+u8 send_cmd(char * cmd, const char* answer, u16 wait_ime) {
+	u8 i = AT_CMD_REPEAT_TIMES, len;
+	char *p;
+#ifdef DEBUG
+	printf("Send to Sim5320:%s", cmd);
+#endif
+	//测试10次，在某一次成功就退出
+	while (i--) {
+		CLR_RBUF();
+		SendToGsm(cmd, strlen(cmd));
+		//等待应答"OK"
+		delay_ms(wait_ime);
+		Sim5320_Receive_Data(receive_buf, &len);
+		p = strstr((const char *) receive_buf, answer);
+		if (p != NULL) {
+			return 1;
+		}
 	}
-	return NULL;
+	return 0;
 }
 
 /***********************发送联机指令AT******************************
@@ -108,23 +116,18 @@ u8 *mystrstr(u8 *s, u8 *t) {
  *备    注: 测试GSM模块是否连接正确
  *****************************************************************/
 void Send_AT(void) {
-	u8 *p, i = ATwaits, len; //
 	char cmd[50];
-	//测试10次，在某一次成功就退出
-	while (i--) {
-		CLR_RBUF();
-		sprintf(cmd, "AT\r\n");
-		SendToGsm(cmd, strlen(cmd));
-		printf("Send to Sim5320:%s", cmd);
-		//等待应答"OK"
-		delay_ms(500);
-		Sim5320_Receive_Data(receive_buf, &len);
-		p = mystrstr(receive_buf, "OK");
-		if (p != NULL) {
-			printf("Send_AT Reiceive OK\r\n");
-			break;
-		}
+	u8 result = 0;
+	sprintf(cmd, "%s\r\n", "AT");
+	result = send_cmd(cmd, "OK", 500);
+
+#ifdef DEBUG
+	if (result == 1) {
+		printf("Send_AT Reiceive OK\r\n");
+	} else {
+		printf("Send_AT fail to reiceive OK\r\n");
 	}
+#endif
 }
 
 /***********************发送取消回显指令******************************
@@ -134,23 +137,18 @@ void Send_AT(void) {
  *备    注: 设置无回显功能
  *****************************************************************/
 void Send_ATE0(void) {
-	u8 *p, i = ATwaits, len; //
 	char cmd[50];
-	//测试10次，在某一次成功就退出
-	while (i--) {
-		CLR_RBUF();
-		sprintf(cmd, "%s\r\n", ATE0);
-		SendToGsm(cmd, strlen(cmd));
-		printf("Send to Sim5320:%s", cmd);
-		//等待应答"OK"
-		delay_ms(500);
-		Sim5320_Receive_Data(receive_buf, &len);
-		p = mystrstr(receive_buf, "OK");
-		if (p != NULL) {
-			printf("Send_ATE0 Reiceive OK\r\n");
-			break;
-		}
+	u8 result = 0;
+	sprintf(cmd, "%s\r\n", ATE0);
+	result = send_cmd(cmd, "OK", 500);
+
+#ifdef DEBUG
+	if (result == 1) {
+		printf("Send_ATE0 Reiceive OK\r\n");
+	} else {
+		printf("Send_ATE0 fail to reiceive OK\r\n");
 	}
+#endif
 }
 
 /***********************网络注册状态******************************
@@ -160,31 +158,27 @@ void Send_ATE0(void) {
  *备    注: 查询网络注册状+CREG: 0,2//没注册 +CREG: 0,1//注册上了
  *****************************************************************/
 void Check_Net_Register(void) {
-	u8 *p, i = 20, len; //
 	char cmd[50];
-	//测试10次，在某一次成功就退出
-	while (i--) {
-		CLR_RBUF();
-		sprintf(cmd, "%s%s\r\n", AT, Creg_Mes);
-		SendToGsm(cmd, strlen(cmd));
-		printf("Send to Sim5320:%s", cmd);
-		//等待应答"OK"
-		delay_ms(500);
-		Sim5320_Receive_Data(receive_buf, &len);
-		p = mystrstr(receive_buf, "OK");
+	char *p;
+	u8 result = 0;
+	sprintf(cmd, "%s%s\r\n", AT, Creg_Mes);
+	result = send_cmd(cmd, "OK", 500);
+
+#ifdef DEBUG
+	if (result == 1) {
+		printf("Check_Net_Register Reiceive OK\r\n");
+		p = strstr((const char*) receive_buf, "+CREG: 0,1");
 		if (p != NULL) {
-			printf("Send_ATE0 Reiceive OK\r\n");
-			p = mystrstr(receive_buf, "+CREG: 0,1");
-			if (p != NULL) {
-				printf("sim has register\r\n");
-			}
-			p = mystrstr(receive_buf, "+CREG: 0,2");
-			if (p != NULL) {
-				printf("sim not register\r\n");
-			}
-			break;
+			printf("sim has register\r\n");
 		}
+		p = strstr((const char*) receive_buf, "+CREG: 0,2");
+		if (p != NULL) {
+			printf("sim not register\r\n");
+		}
+	} else {
+		printf("Check_Net_Register fail to reiceive OK\r\n");
 	}
+#endif
 }
 
 /***********************设置短消息模式******************************
@@ -194,29 +188,22 @@ void Check_Net_Register(void) {
  *备    注:    1 TEXT
  *****************************************************************/
 void Set_MODE(u8 m) {
-	u8 *p, i = ATwaits, len; //
 	char cmd[50];
-	//测试10次，在某一次成功就退出
-	while (i--) {
-		CLR_RBUF();
-		if (m) {
-			sprintf(cmd, "%s%s\r\n", AT, TxtMode);
-			SendToGsm(cmd, strlen(cmd));
-		} else {
-			sprintf(cmd, "%s%s\r\n", AT, PDUMode);
-			SendToGsm(cmd, strlen(cmd));
-		}
-		printf("Send to Sim5320:%s", cmd);
-		//等待应答"OK"
-		delay_ms(500);
-		Sim5320_Receive_Data(receive_buf, &len);
-		p = mystrstr(receive_buf, "OK");
-		if (p != NULL) {
-			printf("Set_MODE Reiceive OK\r\n");
-			break;
-		}
+	u8 result = 0;
+	if (m) {
+		sprintf(cmd, "%s%s\r\n", AT, TxtMode);
+	} else {
+		sprintf(cmd, "%s%s\r\n", AT, PDUMode);
 	}
+	result = send_cmd(cmd, "OK", 500);
 
+#ifdef DEBUG
+	if (result == 1) {
+		printf("Set_MODE Reiceive OK\r\n");
+	} else {
+		printf("Set_MODE fail to reiceive OK\r\n");
+	}
+#endif
 }
 
 /***********************设置短消息模式******************************
@@ -226,23 +213,18 @@ void Set_MODE(u8 m) {
  *备    注:
  *****************************************************************/
 void Set_CNMI(void) {
-	u8 *p, i = ATwaits, len; //
 	char cmd[50];
-	//测试10次，在某一次成功就退出
-	while (i--) {
-		CLR_RBUF();
-		sprintf(cmd, "%s%s\r\n", AT, IND_Mes);
-		SendToGsm(cmd, strlen(cmd));
-		printf("Send to Sim5320:%s", cmd);
-		//等待应答"OK"
-		delay_ms(500);
-		Sim5320_Receive_Data(receive_buf, &len);
-		p = mystrstr(receive_buf, "OK");
-		if (p != NULL) {
-			printf("Set_CNMI Reiceive OK\r\n");
-			break;
-		}
+	u8 result = 0;
+	sprintf(cmd, "%s%s\r\n", AT, IND_Mes);
+	result = send_cmd(cmd, "OK", 500);
+
+#ifdef DEBUG
+	if (result == 1) {
+		printf("Set_CNMI Reiceive OK\r\n");
+	} else {
+		printf("Set_CNMI fail to reiceive OK\r\n");
 	}
+#endif
 }
 
 /***********************设置短消息模式******************************
@@ -252,23 +234,18 @@ void Set_CNMI(void) {
  *备    注:
  *****************************************************************/
 void Set_CMGD(void) {
-	u8 *p, i = ATwaits, len; //
 	char cmd[50];
-	//测试10次，在某一次成功就退出
-	while (i--) {
-		CLR_RBUF();
-		sprintf(cmd, "%s%s\r\n", AT, clear_Mes);
-		SendToGsm(cmd, strlen(cmd));
-		printf("Send to Sim5320:%s", cmd);
-		//等待应答"OK"
-		delay_ms(500);
-		Sim5320_Receive_Data(receive_buf, &len);
-		p = mystrstr(receive_buf, "OK");
-		if (p != NULL) {
-			printf("Set_CMGD Reiceive OK\r\n");
-			break;
-		}
+	u8 result = 0;
+	sprintf(cmd, "%s%s\r\n", AT, clear_Mes);
+	result = send_cmd(cmd, "OK", 500);
+
+#ifdef DEBUG
+	if (result == 1) {
+		printf("Set_CMGD Reiceive OK\r\n");
+	} else {
+		printf("Set_CMGD fail to reiceive OK\r\n");
 	}
+#endif
 }
 
 /***********************波特率设置******************************
@@ -278,23 +255,18 @@ void Set_CMGD(void) {
  *备    注:
  *****************************************************************/
 void Set_IPR9600(void) {
-	u8 *p, i = ATwaits, len;
 	char cmd[50];
-	//测试10次，在某一次成功就退出
-	while (i--) {
-		CLR_RBUF();
-		sprintf(cmd, "%s%s\r\n", AT, IPR);
-		SendToGsm(cmd, strlen(cmd));
-		printf("Send to Sim5320:%s", cmd);
-		//等待应答"OK"
-		delay_ms(500);
-		Sim5320_Receive_Data(receive_buf, &len);
-		p = mystrstr(receive_buf, "OK");
-		if (p != NULL) {
-			printf("Set_IPR9600 Reiceive OK\r\n");
-			break;
-		}
+	u8 result = 0;
+	sprintf(cmd, "%s%s\r\n", AT, IPR);
+	result = send_cmd(cmd, "OK", 500);
+
+#ifdef DEBUG
+	if (result == 1) {
+		printf("Set_IPR9600 Reiceive OK\r\n");
+	} else {
+		printf("Set_IPR9600 fail to reiceive OK\r\n");
 	}
+#endif
 }
 
 /***********************波特率设置******************************
@@ -304,23 +276,18 @@ void Set_IPR9600(void) {
  *备    注:
  *****************************************************************/
 void Set_IPR115200(void) {
-	u8 *p, i = ATwaits, len;
 	char cmd[50];
-	//测试10次，在某一次成功就退出
-	while (i--) {
-		CLR_RBUF();
-		sprintf(cmd, "%s%s\r\n", AT, IPR1);
-		SendToGsm(cmd, strlen(cmd));
-		printf("Send to Sim5320:%s", cmd);
-		//等待应答"OK"
-		delay_ms(2000);
-		Sim5320_Receive_Data(receive_buf, &len);
-		p = mystrstr(receive_buf, "OK");
-		if (p != NULL) {
-			printf("Set_IPR115200 Reiceive OK\r\n");
-			break;
-		}
+	u8 result = 0;
+	sprintf(cmd, "%s%s\r\n", AT, IPR1);
+	result = send_cmd(cmd, "OK", 500);
+
+#ifdef DEBUG
+	if (result == 1) {
+		printf("Set_IPR115200 Reiceive OK\r\n");
+	} else {
+		printf("Set_IPR115200 fail to reiceive OK\r\n");
 	}
+#endif
 }
 
 /***********************查看附着GPRS情况******************************
@@ -330,31 +297,27 @@ void Set_IPR115200(void) {
  *备    注:
  *****************************************************************/
 void Check_Packet_Domain_Attach(void) {
-	u8 *p, i = ATwaits, len;
 	char cmd[50];
-	//测试10次，在某一次成功就退出
-	while (i--) {
-		CLR_RBUF();
-		sprintf(cmd, "%s%s\r\n", AT, CGATT);
-		SendToGsm(cmd, strlen(cmd));
-		printf("Send to Sim5320:%s", cmd);
-		//等待应答"OK"
-		delay_ms(500);
-		Sim5320_Receive_Data(receive_buf, &len);
-		p = mystrstr(receive_buf, "OK");
+	char *p;
+	u8 result = 0;
+	sprintf(cmd, "%s%s\r\n", AT, CGATT);
+	result = send_cmd(cmd, "OK", 500);
+
+#ifdef DEBUG
+	if (result == 1) {
+		printf("Check_Packet_Domain_Attach Reiceive OK\r\n");
+		p = strstr((const char*) receive_buf, "+CGATT: 1");
 		if (p != NULL) {
-			printf("Set_IPR115200 Reiceive OK\r\n");
-			p = mystrstr(receive_buf, "+CGATT: 1");
-			if (p != NULL) {
-				printf("sim net has register\r\n");
-			}
-			p = mystrstr(receive_buf, "+CGATT: 0");
-			if (p != NULL) {
-				printf("sim net not register\r\n");
-			}
-			break;
+			printf("sim has Domain_Attach\r\n");
 		}
+		p = strstr((const char*) receive_buf, "+CGATT: 0");
+		if (p != NULL) {
+			printf("sim not Domain_Attach\r\n");
+		}
+	} else {
+		printf("Check_Packet_Domain_Attach fail to reiceive OK\r\n");
 	}
+#endif
 }
 
 /***********************设置APN****************************
@@ -364,23 +327,18 @@ void Check_Packet_Domain_Attach(void) {
  *备    注:
  *****************************************************************/
 void Set_APN(void) {
-	u8 *p, i = ATwaits, len; //
 	char cmd[50];
-	while (i--) //测试10次，在某一次成功就退出
-	{
-		CLR_RBUF();
-		sprintf(cmd, "AT+CGSOCKCONT=1,\"IP\",\"3gnet\"\r\n");
-		SendToGsm(cmd, strlen(cmd));
-		printf("Send to Sim5320:%s", cmd);
-		//等待应答"OK"
-		delay_ms(5000);
-		Sim5320_Receive_Data(receive_buf, &len);
-		p = mystrstr(receive_buf, "OK");
-		if (p != NULL) {
-			printf("Set_APN Reiceive OK\r\n");
-			break;   //接收到"OK"
-		}
+	u8 result = 0;
+	sprintf(cmd, "AT+CGSOCKCONT=1,\"IP\",\"3gnet\"\r\n");
+	result = send_cmd(cmd, "OK", 2000);
+
+#ifdef DEBUG
+	if (result == 1) {
+		printf("Set_APN Reiceive OK\r\n");
+	} else {
+		printf("Set_APN fail to reiceive OK\r\n");
 	}
+#endif
 }
 
 /***********************打开网络******************************
@@ -390,27 +348,27 @@ void Set_APN(void) {
  *备    注:
  *****************************************************************/
 void OPEN_NET(void) {
-	u8 *p, i = ATwaits, len; //
 	char cmd[50];
-	while (i--) //测试10次，在某一次成功就退出
-	{
-		CLR_RBUF();
-		sprintf(cmd, "AT+NETOPEN=\"%s\",%s\r\n", modetbl[0], port);
-		SendToGsm(cmd, strlen(cmd));
-		printf("Send to Sim5320:%s", cmd);
-		delay_ms(5000);
-		Sim5320_Receive_Data(receive_buf, &len);
-		p = mystrstr(receive_buf, "Network opened");
+	char *p;
+	u8 result = 0;
+	sprintf(cmd, "AT+NETOPEN=\"%s\",%s\r\n", modetbl[0], port);
+	result = send_cmd(cmd, "opened", 2000);
+
+#ifdef DEBUG
+	if (result == 1) {
+		printf("OPEN_NET Reiceive OK\r\n");
+		p = strstr((const char*) receive_buf, "Network opened");
 		if (p != NULL) {
 			printf("OPEN_NET Network opened\r\n");
-			break;
 		}
-		p = mystrstr(receive_buf, "Network is already opened");
+		p = strstr((const char*) receive_buf, "Network is already opened");
 		if (p != NULL) {
 			printf("OPEN_NET Network is already opened\r\n");
-			break;
 		}
+	} else {
+		printf("OPEN_NET fail to reiceive OK\r\n");
 	}
+#endif
 }
 
 /***********************链接服务器******************************
@@ -420,31 +378,29 @@ void OPEN_NET(void) {
  *备    注:
  *****************************************************************/
 void CONNECT_SEV(void) {
-	u8 *p, i = ATwaits, len; //
 	char cmd[50];
-	while (i--) //测试10次，在某一次成功就退出
-	{
-		CLR_RBUF();
-		sprintf(cmd, "AT+TCPCONNECT=\"%s\",%s\r\n", ipbuf, port);
-		SendToGsm(cmd, strlen(cmd));
-		printf("Send to Sim5320:%s", cmd);
-		delay_ms(5000);
-		delay_ms(5000);
-		Sim5320_Receive_Data(receive_buf, &len);
-		p = mystrstr(receive_buf, "Connect ok");
-		if (p != NULL) {
-			network_connect_flag = 1;
-			printf("CONNECT_SEV Connect ok\r\n");
-			break;   //接收到"OK"
-		}
+	u8 result = 0;
+	sprintf(cmd, "AT+TCPCONNECT=\"%s\",%s\r\n", ipbuf, port);
+	result = send_cmd(cmd, "OK", 2000);
+
+	if (result == 1) {
+		network_connect_flag = 1;
+#ifdef DEBUG
+		printf("CONNECT_SEV Reiceive OK\r\n");
+#endif
+	} else {
+		network_connect_flag = 0;
+#ifdef DEBUG
+		printf("CONNECT_SEV fail to reiceive OK\r\n");
+#endif
 	}
 }
 
 void Send_String_To_Server(char string[]) {
-	u8 *p, i = ATwaits, len;
+	u8 i = AT_CMD_REPEAT_TIMES, len;
+	char *p;
 	char cmd[50];
 	//测试10次，在某一次成功就退出
-
 	if (network_connect_flag == 0) {
 		CONNECT_SEV();
 	} else {
@@ -452,15 +408,19 @@ void Send_String_To_Server(char string[]) {
 			CLR_RBUF();
 			sprintf(cmd, "%sTCPWRITE=%d\r\n", AT, strlen(string));
 			SendToGsm(cmd, strlen(cmd));
+#ifdef DEBUG
 			printf("Send to Sim5320:%s", cmd);
+#endif
 			delay_ms(2000);
 			SendToGsm(string, strlen(string));
 			printf("Send to Sim5320:%s", string);
 			delay_ms(5000);
 			Sim5320_Receive_Data(receive_buf, &len);
-			p = mystrstr(receive_buf, "Send ok");
+			p = strstr((const char*) receive_buf, "Send ok");
 			if (p != NULL) {
+#ifdef DEBUG
 				printf("Send_String_To_Server Reiceive OK\r\n");
+#endif
 				break;   //接收到"OK"
 			}
 		}
@@ -474,22 +434,18 @@ void Send_String_To_Server(char string[]) {
  *备    注:
  *****************************************************************/
 void CIPHEAD(void) {
-	u8 *p, i = ATwaits, len; //
 	char cmd[50];
-	//测试10次，在某一次成功就退出
-	while (i--) {
-		CLR_RBUF();
-		sprintf(cmd, "%sCIPHEAD=0\r\n", AT);
-		SendToGsm(cmd, strlen(cmd));
-		printf("Send to Sim5320:%s", cmd);
-		delay_ms(2000);
-		Sim5320_Receive_Data(receive_buf, &len);
-		p = mystrstr(receive_buf, "OK");
-		if (p != NULL) {
-			printf("CIPHEAD Reiceive OK\r\n");
-			break;   //接收到"OK"
-		}
+	u8 result = 0;
+	sprintf(cmd, "%sCIPHEAD=0\r\n", AT);
+	result = send_cmd(cmd, "OK", 1000);
+
+#ifdef DEBUG
+	if (result == 1) {
+		printf("CIPHEAD Reiceive OK\r\n");
+	} else {
+		printf("CIPHEAD fail to reiceive OK\r\n");
 	}
+#endif
 }
 
 /***********************关闭显示源数据IP地址和端口****************************
@@ -499,22 +455,18 @@ void CIPHEAD(void) {
  *备    注:
  *****************************************************************/
 void CIPSRIP(void) {
-	u8 *p, i = ATwaits, len; //
 	char cmd[50];
-	//测试10次，在某一次成功就退出
-	while (i--) {
-		CLR_RBUF();
-		sprintf(cmd, "%sCIPSRIP=0\r\n", AT);
-		SendToGsm(cmd, strlen(cmd));
-		printf("Send to Sim5320:%s", cmd);
-		delay_ms(2000);
-		Sim5320_Receive_Data(receive_buf, &len);
-		p = mystrstr(receive_buf, "OK");
-		if (p != NULL) {
-			printf("CIPSRIP Reiceive OK\r\n");
-			break;   //接收到"OK"
-		}
+	u8 result = 0;
+	sprintf(cmd, "%sCIPSRIP=0\r\n", AT);
+	result = send_cmd(cmd, "OK", 1000);
+
+#ifdef DEBUG
+	if (result == 1) {
+		printf("CIPSRIP Reiceive OK\r\n");
+	} else {
+		printf("CIPSRIP fail to reiceive OK\r\n");
 	}
+#endif
 }
 
 /***********************关闭网络连接******************************
@@ -524,22 +476,20 @@ void CIPSRIP(void) {
  *备    注:
  *****************************************************************/
 void Close_Network(void) {
-	u8 *p, i = ATwaits, len; //
 	char cmd[50];
-	while (i--) //测试10次，在某一次成功就退出
-	{
-		CLR_RBUF();
-		sprintf(cmd, "AT+NETCLOSE\r\n");
-		SendToGsm(cmd, strlen(cmd));
-		printf("Send to Sim5320:%s", cmd);
-		delay_ms(5000);
-		Sim5320_Receive_Data(receive_buf, &len);
-		p = mystrstr(receive_buf, "Network closed");
-		if (p != NULL) {
-			network_connect_flag = 0;
-			printf("Close_Network Network closed\r\n");
-			break;   //接收到"OK"
-		}
+	u8 result = 0;
+	sprintf(cmd, "AT+NETCLOSE\r\n");
+	result = send_cmd(cmd, "OK", 2000);
+
+	if (result == 1) {
+		network_connect_flag = 0;
+#ifdef DEBUG
+		printf("Close_Network Reiceive OK\r\n");
+#endif
+	} else {
+#ifdef DEBUG
+		printf("Close_Network fail to reiceive OK\r\n");
+#endif
 	}
 }
 
@@ -550,22 +500,21 @@ void Close_Network(void) {
  *备    注:
  *****************************************************************/
 void Open_GPS(void) {
-	u8 *p, i = ATwaits, len; //
 	char cmd[50];
-	while (i--) //测试10次，在某一次成功就退出
-	{
-		CLR_RBUF();
-		sprintf(cmd, "AT+CGPS=1\r\n");
-		SendToGsm(cmd, strlen(cmd));
-		printf("Send to Sim5320:%s", cmd);
-		delay_ms(5000);
-		Sim5320_Receive_Data(receive_buf, &len);
-		p = mystrstr(receive_buf, "OK");
-		if (p != NULL) {
-			gps_flag = 1;
-			printf("Open_GPS OK\r\n");
-			break;   //接收到"OK"
-		}
+	u8 result = 0;
+	sprintf(cmd, "AT+CGPS=1\r\n");
+	result = send_cmd(cmd, "OK", 1000);
+
+	if (result == 1) {
+		gps_flag = 1;
+#ifdef DEBUG
+		printf("Open_GPS Reiceive OK\r\n");
+#endif
+	} else {
+		gps_flag = 0;
+#ifdef DEBUG
+		printf("Open_GPS fail to reiceive OK\r\n");
+#endif
 	}
 }
 
@@ -576,22 +525,20 @@ void Open_GPS(void) {
  *备    注:
  *****************************************************************/
 void Close_GPS(void) {
-	u8 *p, i = ATwaits, len; //
 	char cmd[50];
-	while (i--) //测试10次，在某一次成功就退出
-	{
-		CLR_RBUF();
-		sprintf(cmd, "AT+CGPS=0\r\n");
-		SendToGsm(cmd, strlen(cmd));
-		printf("Send to Sim5320:%s", cmd);
-		delay_ms(5000);
-		Sim5320_Receive_Data(receive_buf, &len);
-		p = mystrstr(receive_buf, "OK");
-		if (p != NULL) {
-			gps_flag = 0;
-			printf("Close_GPS OK\r\n");
-			break;   //接收到"OK"
-		}
+	u8 result = 0;
+	sprintf(cmd, "AT+CGPS=0\r\n");
+	result = send_cmd(cmd, "OK", 1000);
+
+	if (result == 1) {
+		gps_flag = 0;
+#ifdef DEBUG
+		printf("Close_GPS Reiceive OK\r\n");
+#endif
+	} else {
+#ifdef DEBUG
+		printf("Close_GPS fail to reiceive OK\r\n");
+#endif
 	}
 }
 
@@ -602,22 +549,20 @@ void Close_GPS(void) {
  *备    注:
  *****************************************************************/
 void Get_GPS_Info(char *info) {
-	u8 *p, i = ATwaits, len; //
 	char cmd[50];
-	while (i--) //测试10次，在某一次成功就退出
-	{
-		CLR_RBUF();
-		sprintf(cmd, "AT+CGPSINFO\r\n");
-		SendToGsm(cmd, strlen(cmd));
-		printf("Send to Sim5320:%s", cmd);
-		delay_ms(5000);
-		Sim5320_Receive_Data(receive_buf, &len);
-		p = mystrstr(receive_buf, "OK");
-		if (p != NULL) {
-			sprintf(info, "%s\r\n", receive_buf);
-			printf("Get_GPS_Info OK\r\n");
-			break;   //接收到"OK"
-		}
+	u8 result = 0;
+	sprintf(cmd, "AT+CGPSINFO\r\n");
+	result = send_cmd(cmd, "OK", 2000);
+
+	if (result == 1) {
+		sprintf(info, "%s\r\n", receive_buf);
+#ifdef DEBUG
+		printf("Get_GPS_Info Reiceive OK\r\n");
+#endif
+	} else {
+#ifdef DEBUG
+		printf("Get_GPS_Info fail to reiceive OK\r\n");
+#endif
 	}
 }
 
@@ -633,7 +578,7 @@ void GPRS_INT(void) {
 	delay_ms(5000);
 	delay_ms(5000);
 	delay_ms(5000);   //等待SIM5320硬件初始化
-//	Set_IPR115200();
+	Set_IPR115200();
 	Send_AT();		//AT联机测试
 	Send_ATE0();	//取消回显
 //	Set_CNMI();		//設置短信提示
@@ -646,7 +591,6 @@ void GPRS_INT(void) {
 	CONNECT_SEV();
 	CIPHEAD();
 	CIPSRIP();
-//	delay_ms(200);
 //	Send_String_To_Server("this is a test message");
 }
 

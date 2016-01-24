@@ -34,7 +34,7 @@
 									<listOptionValue builtIn="false" value="&quot;D:\Keil\ARM\ARMCC\include&quot;"/>
 									<listOptionValue builtIn="false" value="&quot;D:\Keil\ARM\INC\ST\STM32F10x&quot;"/>
 								</option>
-								<option id="com.arm.tool.c.compiler.option.sysincpath.477643142" name="System include path (-J)" superClass="com.arm.tool.c.compiler.option.sysincpath" valueType="stringList"/>
+								<option id="com.arm.tool.c.compiler.option.sysincpath.477643142" name="System include path (-J)" superClass="com.arm.tool.c.compiler.option.sysincpath"/>
 								<option id="com.arm.tool.c.compiler.option.targetcpu.1588890515" name="Target CPU (--cpu)" superClass="com.arm.tool.c.compiler.option.targetcpu" value="Cortex-M3" valueType="string"/>
 								<option id="com.arm.tool.c.compiler.option.endian.1431241213" name="Byte order" superClass="com.arm.tool.c.compiler.option.endian" value="com.arm.tool.c.compiler.option.endian.little" valueType="enumerated"/>
 								<option id="com.arm.tool.c.compiler.option.inst.1301765709" name="Instruction set" superClass="com.arm.tool.c.compiler.option.inst" value="com.arm.tool.c.compiler.option.inst.thumb" valueType="enumerated"/>

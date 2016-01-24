@@ -1,6 +1,3 @@
-#include "includes.h"
-#include "board.h"
-
 /*
  实验1：UCOSII
  1.	实验目的：测试UCOSII多任务的创建和运行
@@ -25,6 +22,8 @@
  任务初始化函数在系统启动之后必须先调用此函数初始化UCOSII之后才能调用创建函数OSTaskStart以及启动任务函数OSStart();
  对于启动任务函数OSStart()，UCOSII要求是在调用此函数之前系统必须创建至少一个任务，这里我们就创建了TaskStart任务，在这个任务中，我们完成其他任务的创建。
  */
+#include "includes.h"
+#include "board.h"
 
 //设置任务堆栈大小
 #define START_STK_SIZE   512
@@ -88,7 +87,7 @@ void TaskControl(void *pdata) {
 
 	u8 usart2_receive[200];
 	u8 usart2_re_len;
-	u8 *p;
+	char *p;
 
 	char gps_info[100];
 	while (1) {
@@ -105,20 +104,27 @@ void TaskControl(void *pdata) {
 		if (usart1_re_len > 0) {
 			Usart_Send_Data(USART2, usart1_receive, usart1_re_len);
 		}
-		p = mystrstr(usart2_receive, "exit");
+
+		p = strstr((const char*)usart2_receive, "exit");
 		if (p != NULL && Get_Connect_Flag() == 1) {
 			Close_Network();
 			Close_GPS();
 		}
-		if (usart2_re_len > 0 && Get_Connect_Flag() == 1) {
-			Send_String_To_Server((char*) usart2_receive);
-		}
-		if (Get_Connect_Flag() == 0) {
+
+		p = strstr((const char*)usart2_receive, "connect");
+		if (p != NULL && Get_Connect_Flag() == 0) {
+			Open_GPS();
+			OPEN_NET();
 			CONNECT_SEV();
 		}
 
-		times++;
+		if (usart2_re_len > 0 && Get_Connect_Flag() == 1) {
+			Send_String_To_Server((char*) usart2_receive);
+		}else if (usart2_re_len > 0 && Get_Connect_Flag() == 0) {
+			SendToGsm((char*)usart2_receive, usart2_re_len);
+		}
 
+		times++;
 		if (times > 120) {
 			times = 0;
 			if (Get_Gps_Statue_Flag() == 1) {
