@@ -34,23 +34,10 @@ u8 network_connect_flag = 0; //GPRS连接状态
 /*0-未打开，1-已打开*/
 u8 gps_flag = 0; //GPS开启/关闭状态
 
-u8 AT[] = "AT+"; //联机命令
-u8 ATE0[] = "ATE0"; //取消回显
-u8 Creg_Mes[] = "CREG?";    //注册
-u8 TxtMode[] = "CMGF=1"; //AT+CMGF=1短信模式设置Text;AT+CMGF=0 PDU模式
-u8 PDUMode[] = "CMGF=0"; //AT+CMGF=1短信模式设置Text;AT+CMGF=0 PDU模式
-u8 Send_Mes[] = "CMGS=";  //发送消息
-u8 IND_Mes[] = "CNMI=2,1";  //接收消息
-u8 clear_Mes[] = "CMGD=1";  //消除第一个位置消息
-u8 get_Mes[] = "CMGR=1";  //消除第一个位置消息
-u8 MEG_CONST[] = "XI LAN HUA JI SHU ";  //短信内容
-u8 MSG_PHO[] = "18312666591";  //接收号码
-u8 IPR[] = "IPR=9600";  //修改波特率为9600
-u8 IPR1[] = "IPR=115200";  //修改波特率为115200
-u8 CGATT[] = "CGATT?";
-const u8 *modetbl[2] = { "TCP", "UDP" };  //
-const u8 port[] = "7015";	//
-u8 ipbuf[] = "120.27.100.18"; 	//IP
+const u8 AT[] = "AT+"; //联机命令
+const u8 *modetbl[2] = { "TCP", "UDP" }; //连接方式
+const u8 port[] = "7015"; //端口
+const u8 ipbuf[] = "120.27.100.18"; //IP地址
 
 const u8 MAX_RECEIVE_LEN = 200;
 u8 receive_buf[MAX_RECEIVE_LEN];
@@ -84,7 +71,7 @@ void SendToGsm(char* p, u8 len) {
 
 /**
  * @Description: 发送指定到SIM5320
- * @param cmd:命令字符串, answer:期待回复字符串
+ * @param cmd:命令字符串, answer:期待回复字符串， wait_time:发送失败时，等待重发时间
  * @return 0-发送失败，1-发送成功
  * @author Sujunqin
  */
@@ -139,7 +126,7 @@ void Send_AT(void) {
 void Send_ATE0(void) {
 	char cmd[50];
 	u8 result = 0;
-	sprintf(cmd, "%s\r\n", ATE0);
+	sprintf(cmd, "%s\r\n", "ATE0");
 	result = send_cmd(cmd, "OK", 500);
 
 #ifdef DEBUG
@@ -161,7 +148,7 @@ void Check_Net_Register(void) {
 	char cmd[50];
 	char *p;
 	u8 result = 0;
-	sprintf(cmd, "%s%s\r\n", AT, Creg_Mes);
+	sprintf(cmd, "%s%s\r\n", AT, "CREG?");
 	result = send_cmd(cmd, "OK", 500);
 
 #ifdef DEBUG
@@ -181,73 +168,6 @@ void Check_Net_Register(void) {
 #endif
 }
 
-/***********************设置短消息模式******************************
- *功    能: 串口发送数组命令到SIM5320，AT+CMGF=1 or AT+CMGF=0
- *形    参:    uchar m =1 text模式      m=0 PDU模式
- *返 回 值:
- *备    注:    1 TEXT
- *****************************************************************/
-void Set_MODE(u8 m) {
-	char cmd[50];
-	u8 result = 0;
-	if (m) {
-		sprintf(cmd, "%s%s\r\n", AT, TxtMode);
-	} else {
-		sprintf(cmd, "%s%s\r\n", AT, PDUMode);
-	}
-	result = send_cmd(cmd, "OK", 500);
-
-#ifdef DEBUG
-	if (result == 1) {
-		printf("Set_MODE Reiceive OK\r\n");
-	} else {
-		printf("Set_MODE fail to reiceive OK\r\n");
-	}
-#endif
-}
-
-/***********************设置短消息模式******************************
- *功    能: 串口发送数组命令到SIM5320，接收消息  AT+CNMI=2,1
- *形    参:
- *返 回 值:
- *备    注:
- *****************************************************************/
-void Set_CNMI(void) {
-	char cmd[50];
-	u8 result = 0;
-	sprintf(cmd, "%s%s\r\n", AT, IND_Mes);
-	result = send_cmd(cmd, "OK", 500);
-
-#ifdef DEBUG
-	if (result == 1) {
-		printf("Set_CNMI Reiceive OK\r\n");
-	} else {
-		printf("Set_CNMI fail to reiceive OK\r\n");
-	}
-#endif
-}
-
-/***********************设置短消息模式******************************
- *功    能: 串口发送数组命令到SIM5320，消除第一个位置消息  AT+CMGD=1
- *形    参:
- *返 回 值:
- *备    注:
- *****************************************************************/
-void Set_CMGD(void) {
-	char cmd[50];
-	u8 result = 0;
-	sprintf(cmd, "%s%s\r\n", AT, clear_Mes);
-	result = send_cmd(cmd, "OK", 500);
-
-#ifdef DEBUG
-	if (result == 1) {
-		printf("Set_CMGD Reiceive OK\r\n");
-	} else {
-		printf("Set_CMGD fail to reiceive OK\r\n");
-	}
-#endif
-}
-
 /***********************波特率设置******************************
  *功    能: 串口发送数组命令到SIM5320E，AT+IPR=9600
  *形    参:
@@ -257,7 +177,7 @@ void Set_CMGD(void) {
 void Set_IPR9600(void) {
 	char cmd[50];
 	u8 result = 0;
-	sprintf(cmd, "%s%s\r\n", AT, IPR);
+	sprintf(cmd, "%s%s\r\n", AT, "IPR=9600");
 	result = send_cmd(cmd, "OK", 500);
 
 #ifdef DEBUG
@@ -278,7 +198,7 @@ void Set_IPR9600(void) {
 void Set_IPR115200(void) {
 	char cmd[50];
 	u8 result = 0;
-	sprintf(cmd, "%s%s\r\n", AT, IPR1);
+	sprintf(cmd, "%s%s\r\n", AT, "IPR=115200");
 	result = send_cmd(cmd, "OK", 500);
 
 #ifdef DEBUG
@@ -300,7 +220,7 @@ void Check_Packet_Domain_Attach(void) {
 	char cmd[50];
 	char *p;
 	u8 result = 0;
-	sprintf(cmd, "%s%s\r\n", AT, CGATT);
+	sprintf(cmd, "%s%s\r\n", AT, "CGATT?");
 	result = send_cmd(cmd, "OK", 500);
 
 #ifdef DEBUG
@@ -411,10 +331,10 @@ void Send_String_To_Server(char string[]) {
 #ifdef DEBUG
 			printf("Send to Sim5320:%s", cmd);
 #endif
-			delay_ms(2000);
+			delay_ms(1000);
 			SendToGsm(string, strlen(string));
 			printf("Send to Sim5320:%s", string);
-			delay_ms(5000);
+			delay_ms(2000);
 			Sim5320_Receive_Data(receive_buf, &len);
 			p = strstr((const char*) receive_buf, "Send ok");
 			if (p != NULL) {
@@ -566,34 +486,6 @@ void Get_GPS_Info(char *info) {
 	}
 }
 
-/***********************GPRS初始化******************************
- *功    能:
- *形    参:
- *返 回 值:
- *备    注:
- *****************************************************************/
-void GPRS_INT(void) {
-	delay_ms(5000);
-	delay_ms(5000);
-	delay_ms(5000);
-	delay_ms(5000);
-	delay_ms(5000);   //等待SIM5320硬件初始化
-	Set_IPR115200();
-	Send_AT();		//AT联机测试
-	Send_ATE0();	//取消回显
-//	Set_CNMI();		//設置短信提示
-//	Set_MODE(1);	//设置短信格式文本
-	Check_Net_Register();		//查询网络注册
-	Check_Packet_Domain_Attach();
-	Open_GPS();
-	Set_APN();
-	OPEN_NET();
-	CONNECT_SEV();
-	CIPHEAD();
-	CIPSRIP();
-//	Send_String_To_Server("this is a test message");
-}
-
 /*****************************************************
  *功    能:获取网络连接状态
  *形    参:
@@ -613,3 +505,29 @@ u8 Get_Connect_Flag(void) {
 u8 Get_Gps_Statue_Flag(void) {
 	return gps_flag;
 }
+
+/**
+ * @Description:SIM5320模块初始化
+ * @param
+ * @return
+ * @author Sujunqin
+ */
+void SIM5320_INT(void) {
+	//等待SIM5320硬件初始化
+	int var = 0;
+	for (var = 0; var < 5; ++var) {
+		delay_ms(5000);
+	}
+	Set_IPR115200();
+	Send_AT();
+	Send_ATE0();
+	Check_Net_Register();
+	Check_Packet_Domain_Attach();
+	Open_GPS();
+	Set_APN();
+	OPEN_NET();
+	CONNECT_SEV();
+	CIPHEAD();
+	CIPSRIP();
+}
+

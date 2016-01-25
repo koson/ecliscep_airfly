@@ -22,7 +22,6 @@
  任务初始化函数在系统启动之后必须先调用此函数初始化UCOSII之后才能调用创建函数OSTaskStart以及启动任务函数OSStart();
  对于启动任务函数OSStart()，UCOSII要求是在调用此函数之前系统必须创建至少一个任务，这里我们就创建了TaskStart任务，在这个任务中，我们完成其他任务的创建。
  */
-#include "includes.h"
 #include "board.h"
 
 //设置任务堆栈大小
@@ -37,25 +36,13 @@
 OS_STK TASK_START_STK[START_STK_SIZE];
 OS_STK TASK_CONTROL_STK[CONTROL_STK_SIZE];
 
+void hardware_init(void);
 //任务申明
 void TaskStart(void *pdata);
 void TaskControl(void *pdata);
 
 int main(void) {
-	SystemInit();   //系统初始化 72M
-	delay_init(72);	     //延时初始化
-	NVIC_Configuration();
-
-	uart1_init(115200);	     //串口初始化，波特率115200
-	uart2_init(115200);	     //串口初始化，波特率115200
-
-	printf("complier time:%s,%s\r\n", __DATE__, __TIME__);
-
-	LED_Init();
-	GPRS_INT();
-
-//	Pwm_Cap_Init(0xffff, 72); //PWM捕获初始化,以1Mhz的频率计数
-//	Pwm_Ouput_Init();                //初始化4路PWM输出
+	hardware_init();
 
 	OSInit();
 	OSTaskCreate(TaskStart,	//task pointer
@@ -80,63 +67,22 @@ void TaskStart(void * pdata) {
 
 //任务1-控制
 void TaskControl(void *pdata) {
-	u16 times = 0;
-
-	u8 usart1_receive[200];
-	u8 usart1_re_len;
-
-	u8 usart2_receive[200];
-	u8 usart2_re_len;
-	char *p;
-
-	char gps_info[100];
-	while (1) {
-
-		LED1 = 1;
-		OSTimeDlyHMSM(0, 0, 0, 500);
-		LED1 = 0;
-		OSTimeDlyHMSM(0, 0, 0, 500);
-
-		usart1_re_len = 0;
-		usart2_re_len = 0;
-		USART2_Receive_Data(usart2_receive, &usart2_re_len);
-		Sim5320_Receive_Data(usart1_receive, &usart1_re_len);
-		if (usart1_re_len > 0) {
-			Usart_Send_Data(USART2, usart1_receive, usart1_re_len);
-		}
-
-		p = strstr((const char*)usart2_receive, "exit");
-		if (p != NULL && Get_Connect_Flag() == 1) {
-			Close_Network();
-			Close_GPS();
-		}
-
-		p = strstr((const char*)usart2_receive, "connect");
-		if (p != NULL && Get_Connect_Flag() == 0) {
-			Open_GPS();
-			OPEN_NET();
-			CONNECT_SEV();
-		}
-
-		if (usart2_re_len > 0 && Get_Connect_Flag() == 1) {
-			Send_String_To_Server((char*) usart2_receive);
-		}else if (usart2_re_len > 0 && Get_Connect_Flag() == 0) {
-			SendToGsm((char*)usart2_receive, usart2_re_len);
-		}
-
-		times++;
-		if (times > 120) {
-			times = 0;
-			if (Get_Gps_Statue_Flag() == 1) {
-
-				Get_GPS_Info(gps_info);
-				if (Get_Connect_Flag() == 1) {
-					Send_String_To_Server(gps_info);
-				} else {
-					CONNECT_SEV();
-				}
-			}
-		}
+	for (;;) {
+		sim5320_test();
 	}
+}
+
+//硬件初始化
+void hardware_init() {
+	SystemInit(); //系统初始化 72M
+	delay_init(72); //延时初始化
+	NVIC_Configuration();
+	uart1_init(115200); //串口初始化，波特率115200
+	uart2_init(115200); //串口初始化，波特率115200
+	printf("complier time:%s,%s\r\n", __DATE__, __TIME__);
+	LED_Init();
+	//	Pwm_Cap_Init(0xffff, 72); //PWM捕获初始化,以1Mhz的频率计数
+	//	Pwm_Ouput_Init();                //初始化4路PWM输出
+	SIM5320_INT();
 }
 

@@ -17,10 +17,6 @@ void Sim5320_Receive_Data(u8 *buf, u8 *len);
 void Send_AT(void);
 void Send_ATE0(void);
 void Check_Net_Register(void);
-void Set_MODE(u8 m);
-void Set_CNMI(void);
-void Set_CNMI(void);
-void Set_CMGD(void);
 
 void Set_IPR9600(void);
 void Set_IPR115200(void);
@@ -35,7 +31,7 @@ void Send_String_To_Server(char string[]);
 void Close_Network(void);
 u8 Get_Connect_Flag(void);
 
-void GPRS_INT(void);
+void SIM5320_INT(void);
 void Open_GPS(void);
 void Close_GPS(void);
 void Get_GPS_Info(char *info);
