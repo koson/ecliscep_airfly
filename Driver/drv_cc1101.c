@@ -84,7 +84,7 @@ void CC1101WriteMultiReg(u8 addr, u8 *buff, u8 size);
  ================================================================================
  */
 u8 SPI_ExchangeByte(u8 input) {
-	return SPIx_ReadWriteByte(input);
+	return SPI2_ReadWriteByte(input);
 }
 
 /*
@@ -430,7 +430,7 @@ void CC1101Init(void) {
  * @return
  * @author Sujunqin
  */
-void spi_cs_io_init(void) {
+void spi2_cs_io_init(void) {
 	GPIO_InitTypeDef GPIO_InitStructure;
 
 	RCC_APB2PeriphClockCmd(CC_CSN_IO_PORT_CLK, ENABLE);
@@ -462,8 +462,8 @@ void cc1101_tx_test(void) {
 	char sendstring[] = { "www.ashining.com\r\n" };
 	u8 *sendbuffer = sendstring;
 
-	spi_cs_io_init();
-	SPIx_Init();
+	spi2_cs_io_init();
+	SPI2_Init();
 	CC1101Init();
 
 	while (1) {
@@ -484,8 +484,8 @@ void cc1101_rx_test(void) {
 	u8 rxBuffer[100];
 	u8 i = 0;
 
-	spi_cs_io_init();
-	SPIx_Init();
+	spi2_cs_io_init();
+	SPI2_Init();
 	CC1101Init();                        // Write RF settings to config reg
 	CC1101SetTRMode(RX_MODE);
 

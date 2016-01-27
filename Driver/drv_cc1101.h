@@ -9,7 +9,7 @@
 #define DRV_CC1101_H_
 #include "sys.h"
 #include "drv_cc1101_reg.h"
-#include "spi.h"
+#include "cc1101_spi.h"
 
 /*
  ================================================================================
