@@ -115,11 +115,10 @@ void GS_CC1101WORInit(void) {
  */
 u8 GS_CC1101ReadReg(u8 addr) {
 	u8 i;
-	CC_CSN_LOW( )
-	;
+	CC_CSN_LOW();
 	SPI_ExchangeByte(addr | READ_SINGLE);
 	i = SPI_ExchangeByte(0xFF);
-	CC_CSN_HIGH( );
+	CC_CSN_HIGH();
 	return i;
 }
 /*
@@ -134,15 +133,14 @@ u8 GS_CC1101ReadReg(u8 addr) {
  */
 void GS_CC1101ReadMultiReg(u8 addr, u8 *buff, u8 size) {
 	u8 i, j;
-	CC_CSN_LOW( )
-	;
+	CC_CSN_LOW();
 	SPI_ExchangeByte(addr | READ_BURST);
 	for (i = 0; i < size; i++) {
 		for (j = 0; j < 20; j++)
 			;
 		*(buff + i) = SPI_ExchangeByte(0xFF);
 	}
-	CC_CSN_HIGH( );
+	CC_CSN_HIGH();
 }
 /*
  ================================================================================
@@ -154,11 +152,10 @@ void GS_CC1101ReadMultiReg(u8 addr, u8 *buff, u8 size) {
  */
 u8 CC1101ReadStatus(u8 addr) {
 	u8 i;
-	CC_CSN_LOW( )
-	;
+	CC_CSN_LOW();
 	SPI_ExchangeByte(addr | READ_BURST);
 	i = SPI_ExchangeByte(0xFF);
-	CC_CSN_HIGH( );
+	CC_CSN_HIGH();
 	return i;
 }
 /*
@@ -188,11 +185,10 @@ void CC1101SetTRMode(TRMODE mode) {
  ================================================================================
  */
 void CC1101WriteReg(u8 addr, u8 value) {
-	CC_CSN_LOW( )
-	;
+	CC_CSN_LOW();
 	SPI_ExchangeByte(addr);
 	SPI_ExchangeByte(value);
-	CC_CSN_HIGH( );
+	CC_CSN_HIGH();
 }
 /*
  ================================================================================
@@ -206,13 +202,12 @@ void CC1101WriteReg(u8 addr, u8 value) {
  */
 void CC1101WriteMultiReg(u8 addr, u8 *buff, u8 size) {
 	u8 i;
-	CC_CSN_LOW( )
-	;
+	CC_CSN_LOW();
 	SPI_ExchangeByte(addr | WRITE_BURST);
 	for (i = 0; i < size; i++) {
 		SPI_ExchangeByte(*(buff + i));
 	}
-	CC_CSN_HIGH( );
+	CC_CSN_HIGH();
 }
 /*
  ================================================================================
@@ -223,10 +218,9 @@ void CC1101WriteMultiReg(u8 addr, u8 *buff, u8 size) {
  ================================================================================
  */
 void CC1101WriteCmd(u8 command) {
-	CC_CSN_LOW( )
-	;
+	CC_CSN_LOW();
 	SPI_ExchangeByte(command);
-	CC_CSN_HIGH( );
+	CC_CSN_HIGH();
 }
 /*
  ================================================================================
@@ -239,12 +233,12 @@ void CC1101WriteCmd(u8 command) {
 void CC1101Reset(void) {
 	u8 x;
 
-	CC_CSN_HIGH( );
-	CC_CSN_LOW( )
-	;
-	CC_CSN_HIGH( );
-	for (x = 0; x < 100; x++)
-		;
+	CC_CSN_HIGH();
+	delay_us(10);
+	CC_CSN_LOW();
+	delay_us(10);
+	CC_CSN_HIGH();
+	delay_us(41);
 	CC1101WriteCmd( CC1101_SRES);
 }
 /*
@@ -311,12 +305,14 @@ void CC1101SendPacket(u8 *txbuffer, u8 size, TX_DATA_MODE mode) {
 
 	CC1101WriteMultiReg( CC1101_TXFIFO, txbuffer, size);
 	CC1101SetTRMode(TX_MODE);
-	while (GPIO_ReadInputDataBit( GPIOA, GPIO_Pin_2) != 0)
+	printf("CC1101SendPacket:CC1101SetTRMode\r\n");
+	while (GPIO_ReadInputDataBit( READY_IO_PORT, READY_IO) != 0)
 		;
-	while (GPIO_ReadInputDataBit( GPIOA, GPIO_Pin_2) == 0)
+	while (GPIO_ReadInputDataBit( READY_IO_PORT, READY_IO) == 0)
 		;
 
 	CC1101ClrTXBuff();
+	printf("CC1101SendPacket:CC1101ClrTXBuff\r\n");
 }
 /*
  ================================================================================
@@ -421,7 +417,13 @@ void CC1101Init(void) {
 	CC1101WriteMultiReg(CC1101_PATABLE, PaTabel, 8);
 
 	i = CC1101ReadStatus( CC1101_PARTNUM); //for test, must be 0x80
+#ifdef DEBUG
+	printf("CC1101ReadStatus( CC1101_PARTNUM):%d\r\n", i);
+#endif
 	i = CC1101ReadStatus( CC1101_VERSION); //for test, refer to the datasheet
+#ifdef DEBUG
+	printf("CC1101ReadStatus( CC1101_VERSION):%d\r\n", i);
+#endif
 }
 
 /**
@@ -436,20 +438,21 @@ void spi2_cs_io_init(void) {
 	RCC_APB2PeriphClockCmd(CC_CSN_IO_PORT_CLK, ENABLE);
 	GPIO_InitStructure.GPIO_Pin = CC_CSN_IO; //SPI CS
 	GPIO_InitStructure.GPIO_Mode = GPIO_Mode_Out_PP;  //复用推挽输出
+	GPIO_InitStructure.GPIO_Speed = GPIO_Speed_50MHz;
 	GPIO_Init(CC_CSN_IO_PORT, &GPIO_InitStructure);
 	GPIO_SetBits(CC_CSN_IO_PORT, CC_CSN_IO);
 
 	RCC_APB2PeriphClockCmd(READY_IO_PORT_CLK, ENABLE);
 	GPIO_InitStructure.GPIO_Pin = READY_IO;
-	GPIO_InitStructure.GPIO_Mode = GPIO_Mode_Out_PP;  //复用推挽输出
+	GPIO_InitStructure.GPIO_Mode = GPIO_Mode_IPU;  //复用推挽输出
 	GPIO_Init(READY_IO_PORT, &GPIO_InitStructure);
 	GPIO_SetBits(READY_IO_PORT, READY_IO);
 
-	RCC_APB2PeriphClockCmd(RX_INTERUPT_IO_PORT_CLK, ENABLE);
-	GPIO_InitStructure.GPIO_Pin = RX_INTERUPT_IO;
-	GPIO_InitStructure.GPIO_Mode = GPIO_Mode_Out_PP;  //复用推挽输出
-	GPIO_Init(RX_INTERUPT_IO_PORT, &GPIO_InitStructure);
-	GPIO_SetBits(RX_INTERUPT_IO_PORT, RX_INTERUPT_IO);
+	RCC_APB2PeriphClockCmd(INTERUPT_IO_PORT_CLK, ENABLE);
+	GPIO_InitStructure.GPIO_Pin = INTERUPT_IO;
+	GPIO_InitStructure.GPIO_Mode = GPIO_Mode_IPU;  //复用推挽输出
+	GPIO_Init(INTERUPT_IO_PORT, &GPIO_InitStructure);
+	GPIO_SetBits(INTERUPT_IO_PORT, INTERUPT_IO);
 }
 
 /**
@@ -469,8 +472,10 @@ void cc1101_tx_test(void) {
 	while (1) {
 		//发送数据包，每发送一次，LED闪烁一次
 		CC1101SendPacket(sendbuffer, strlen(sendstring), ADDRESS_CHECK);
-		LED0 = !LED0;
-		delay_ms(1000);
+		LED1 = 1;
+		delay_ms(500);
+		LED1 = 0;
+		delay_ms(500);
 	}
 }
 
@@ -490,11 +495,10 @@ void cc1101_rx_test(void) {
 	CC1101SetTRMode(RX_MODE);
 
 	while (1) {
-		while (GPIO_ReadInputDataBit( GPIOA, RX_INTERUPT_IO) != 0)
+		while (GPIO_ReadInputDataBit( INTERUPT_IO_PORT, INTERUPT_IO) != 0)
 			;
-		while (GPIO_ReadInputDataBit( GPIOA, RX_INTERUPT_IO) == 0)
+		while (GPIO_ReadInputDataBit( INTERUPT_IO_PORT, INTERUPT_IO) == 0)
 			;
-		//如果接收到数据包，LED状态翻转一次
 		i = CC1101RecPacket(rxBuffer);
 		if (i != 0) {
 #ifdef DEBUG

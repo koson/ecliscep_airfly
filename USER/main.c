@@ -68,7 +68,9 @@ void TaskStart(void * pdata) {
 //任务1-控制
 void TaskControl(void *pdata) {
 	for (;;) {
-		sim5320_test();
+//		sim5320_test();
+//		cc1101_tx_test();
+		cc1101_rx_test();
 	}
 }
 
@@ -81,5 +83,6 @@ void hardware_init() {
 	uart2_init(115200); //串口初始化，波特率115200
 	printf("complier time:%s,%s\r\n", __DATE__, __TIME__);
 	LED_Init();
+	delay_ms(1000);
 }
 

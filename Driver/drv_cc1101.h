@@ -21,25 +21,26 @@
  ================================================================================
  */
 u8 SPI_ExchangeByte(u8 input);
-//Î´ÐÞ¸Ä
-#define CC_CSN_IO_PORT_CLK	RCC_APB2Periph_GPIOA
-#define READY_IO_PORT_CLK	RCC_APB2Periph_GPIOA
-#define RX_INTERUPT_IO_PORT_CLK	RCC_APB2Periph_GPIOA
 
-#define CC_CSN_IO_PORT	GPIOA
-#define READY_IO_PORT	GPIOA
-#define RX_INTERUPT_IO_PORT GPIOA
+#define CC_CSN_IO_PORT_CLK	RCC_APB2Periph_GPIOC
+#define READY_IO_PORT_CLK	RCC_APB2Periph_GPIOB
+#define INTERUPT_IO_PORT_CLK	RCC_APB2Periph_GPIOB
 
-#define CC_CSN_IO	GPIO_Pin_4
-#define READY_IO	GPIO_Pin_3
-#define RX_INTERUPT_IO	GPIO_Pin_2
+#define CC_CSN_IO_PORT	GPIOC
+#define READY_IO_PORT	GPIOB
+#define INTERUPT_IO_PORT GPIOB
 
-#define CC_CSN_LOW( ) do { \
-	GPIO_ResetBits( CC_CSN_IO_PORT, CC_CSN_IO ); \
-	while( GPIO_ReadInputDataBit( READY_IO_PORT, READY_IO ) != 0 ); \
-}while (0)
+#define CC_CSN_IO	GPIO_Pin_9
+#define READY_IO	GPIO_Pin_8
+#define INTERUPT_IO	GPIO_Pin_9
 
-#define CC_CSN_HIGH( )  GPIO_SetBits( CC_CSN_IO_PORT, CC_CSN_IO )
+//#define CC_CSN_LOW( ) do { \
+//	GPIO_ResetBits( CC_CSN_IO_PORT, CC_CSN_IO ); \
+//	while( GPIO_ReadInputDataBit( READY_IO_PORT, READY_IO ) != 0 ); \
+//}while (0)
+
+#define CC_CSN_LOW()   GPIO_ResetBits( CC_CSN_IO_PORT, CC_CSN_IO )
+#define CC_CSN_HIGH()  GPIO_SetBits( CC_CSN_IO_PORT, CC_CSN_IO )
 
 /*
  ================================================================================
