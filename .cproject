@@ -21,6 +21,7 @@
 								</option>
 								<option id="com.arm.tool.c.compiler.option.incpath.1511943327" name="Include path (-I)" superClass="com.arm.tool.c.compiler.option.incpath" valueType="includePath">
 									<listOptionValue builtIn="false" value="&quot;${workspace_loc:/${ProjName}/CORE}&quot;"/>
+									<listOptionValue builtIn="false" value="&quot;${workspace_loc:/${ProjName}/HARDWARE/SPI}&quot;"/>
 									<listOptionValue builtIn="false" value="&quot;${workspace_loc:/${ProjName}/HARDWARE/LED}&quot;"/>
 									<listOptionValue builtIn="false" value="&quot;${workspace_loc:/${ProjName}/STM32F10x_FWLib/inc}&quot;"/>
 									<listOptionValue builtIn="false" value="&quot;${workspace_loc:/${ProjName}/SYSTEM/delay}&quot;"/>

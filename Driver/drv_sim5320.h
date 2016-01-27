@@ -31,10 +31,12 @@ void Send_String_To_Server(char string[]);
 void Close_Network(void);
 u8 Get_Connect_Flag(void);
 
-void SIM5320_INT(void);
 void Open_GPS(void);
 void Close_GPS(void);
 void Get_GPS_Info(char *info);
 u8 Get_Gps_Statue_Flag(void);
+void SIM5320_INT(void);
+
+void sim5320_test(void);
 
 #endif /* DRV_SIM5320_H_ */

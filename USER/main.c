@@ -81,8 +81,5 @@ void hardware_init() {
 	uart2_init(115200); //串口初始化，波特率115200
 	printf("complier time:%s,%s\r\n", __DATE__, __TIME__);
 	LED_Init();
-	//	Pwm_Cap_Init(0xffff, 72); //PWM捕获初始化,以1Mhz的频率计数
-	//	Pwm_Ouput_Init();                //初始化4路PWM输出
-	SIM5320_INT();
 }
 

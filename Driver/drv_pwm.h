@@ -1,7 +1,6 @@
 #pragma once
 #include "sys.h"
 
-
 void Pwm_Ouput_Init(void);
 void Moto_PwmRflash(int16_t MOTO1_PWM,int16_t MOTO2_PWM,int16_t MOTO3_PWM,int16_t MOTO4_PWM);
 
@@ -21,3 +20,5 @@ u32 Chanel5_Pwm_Get(void);
 u32 Chanel6_Pwm_Get(void);
 u32 Chanel7_Pwm_Get(void);
 u32 Chanel8_Pwm_Get(void);
+
+void pwm_test(void);
