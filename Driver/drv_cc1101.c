@@ -505,7 +505,7 @@ void halRfSendPacket(u8 *txBuffer, u8 size) {
  * @author Sujunqin
  */
 void cc1101_tx_test(void) {
-	u8 sendstring[] = { 'a', 'b', 'c', 'd', 'e' };
+	u8 sendstring[] = "cc1101_tx_test:send hello";
 	u8 rxbuffer[64];
 	u8 rxlen = 0;
 	u8 i;
@@ -516,7 +516,8 @@ void cc1101_tx_test(void) {
 	while (1) {
 		//发送数据包，每发送一次，LED闪烁一次
 		CC1101SetTRMode(TX_MODE);
-		CC1101SendPacket(sendstring, 5, ADDRESS_CHECK);
+		CC1101SendPacket(sendstring, strlen((const char*) sendstring),
+				ADDRESS_CHECK);
 		LED1 = 1;
 #ifdef DEBUG
 		printf("wait for receiving data\r\n");
@@ -530,12 +531,12 @@ void cc1101_tx_test(void) {
 #ifdef DEBUG
 		printf("rxbuffer(%d):", rxlen);
 		for (i = 0; i < rxlen; ++i) {
-			printf("%c ", rxbuffer[i]);
+			printf("%c", rxbuffer[i]);
 		}
 		printf("\r\n");
 #endif
 		LED1 = 0;
-		delay_ms(5000);
+		delay_ms(1000);
 	}
 }
 
@@ -547,7 +548,7 @@ void cc1101_tx_test(void) {
  */
 void cc1101_rx_test(void) {
 	u8 rxBuffer[64];
-	u8 sendstring[] = { 'a', 'b', 'c', 'd', 'e' };
+	u8 sendstring[] = "cc1101_rx_test:send hi";
 	u8 i = 0;
 	u8 rxlen = 0;
 
@@ -567,18 +568,19 @@ void cc1101_rx_test(void) {
 		while (GPIO_ReadInputDataBit( INTERUPT_IO_PORT, INTERUPT_IO) == 0)
 			;
 		rxlen = CC1101RecPacket(rxBuffer);
-if (rxlen > 0) {
+		if (rxlen > 0) {
 #ifdef DEBUG
-		printf("rxbuffer(%d):", rxlen);
-		for (i = 0; i < rxlen; ++i) {
-			printf("%c ", rxBuffer[i]);
-		}
-		printf("\r\n");
-		CC1101SendPacket(sendstring, 5, ADDRESS_CHECK);
+			printf("rxbuffer(%d):", rxlen);
+			for (i = 0; i < rxlen; ++i) {
+				printf("%c", rxBuffer[i]);
+			}
+			printf("\r\n");
+			CC1101SendPacket(sendstring, strlen((const char*) sendstring),
+					ADDRESS_CHECK);
 #endif
 
-}
+		}
 		LED1 = 1;
-		delay_ms(5000);
+		delay_ms(1000);
 	}
 }
