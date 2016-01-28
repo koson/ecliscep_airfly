@@ -44,15 +44,12 @@ void SPI2_Init(void) {
 	SPI2_InitStructure.SPI_CPOL = SPI_CPOL_High;		//选择了串行时钟的稳态:时钟悬空高
 	SPI2_InitStructure.SPI_CPHA = SPI_CPHA_2Edge;	//数据捕获于第二个时钟沿
 	SPI2_InitStructure.SPI_NSS = SPI_NSS_Soft;//NSS信号由硬件（NSS管脚）还是软件（使用SSI位）管理:内部NSS信号有SSI位控制
-	//修改
-	SPI2_InitStructure.SPI_BaudRatePrescaler = SPI_BaudRatePrescaler_4;//定义波特率预分频的值:波特率预分频值为256
-//	SPI2_InitStructure.SPI_BaudRatePrescaler = SPI_BaudRatePrescaler_256;//定义波特率预分频的值:波特率预分频值为256
+	SPI2_InitStructure.SPI_BaudRatePrescaler = SPI_BaudRatePrescaler_256;//定义波特率预分频的值:波特率预分频值为256
 	SPI2_InitStructure.SPI_FirstBit = SPI_FirstBit_MSB;	//指定数据传输从MSB位还是LSB位开始:数据传输从MSB位开始
 	SPI2_InitStructure.SPI_CRCPolynomial = 7;	//CRC值计算的多项式
 	SPI_Init(SPI2, &SPI2_InitStructure);  //根据SPI_InitStruct中指定的参数初始化外设SPIx寄存器
 
 	SPI_Cmd(SPI2, ENABLE); //使能SPI外设
-
 	SPI2_ReadWriteByte(0xff); //启动传输
 }
 //SPI 速度设置函数

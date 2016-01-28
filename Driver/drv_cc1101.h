@@ -22,6 +22,11 @@
  */
 u8 SPI_ExchangeByte(u8 input);
 
+#define SPI_GPIO_PORT		GPIOB
+#define GPIO_Pin_SO			GPIO_Pin_14
+#define GPIO_Pin_SCLK		GPIO_Pin_13
+#define GPIO_Pin_SI			GPIO_Pin_15
+
 #define CC_CSN_IO_PORT_CLK	RCC_APB2Periph_GPIOC
 #define READY_IO_PORT_CLK	RCC_APB2Periph_GPIOB
 #define INTERUPT_IO_PORT_CLK	RCC_APB2Periph_GPIOB
@@ -31,13 +36,10 @@ u8 SPI_ExchangeByte(u8 input);
 #define INTERUPT_IO_PORT GPIOB
 
 #define CC_CSN_IO	GPIO_Pin_9
-#define READY_IO	GPIO_Pin_8
-#define INTERUPT_IO	GPIO_Pin_9
-
-//#define CC_CSN_LOW( ) do { \
-//	GPIO_ResetBits( CC_CSN_IO_PORT, CC_CSN_IO ); \
-//	while( GPIO_ReadInputDataBit( READY_IO_PORT, READY_IO ) != 0 ); \
-//}while (0)
+//GOD2
+#define READY_IO	GPIO_Pin_9
+//GOD0
+#define INTERUPT_IO	GPIO_Pin_8
 
 #define CC_CSN_LOW()   GPIO_ResetBits( CC_CSN_IO_PORT, CC_CSN_IO )
 #define CC_CSN_HIGH()  GPIO_SetBits( CC_CSN_IO_PORT, CC_CSN_IO )
