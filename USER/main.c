@@ -69,8 +69,8 @@ void TaskStart(void * pdata) {
 void TaskControl(void *pdata) {
 	for (;;) {
 //		sim5320_test();
-		cc1101_tx_test();
-//		cc1101_rx_test();
+//		cc1101_tx_test();
+		cc1101_rx_test();
 	}
 }
 
