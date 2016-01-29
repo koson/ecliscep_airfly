@@ -19,8 +19,8 @@
 //增加了串口接收命令功能.
 //修正了printf第一个字符丢失的bug
 ////////////////////////////////////////////////////////////////////////////////// 
-extern u8 USART_RX_BUF[64];     //接收缓冲,最大63个字节.末字节为换行符 
-extern u8 USART_RX_STA;         //接收状态标记	
+
+#define USART_PRINTF USART1
 
 void uart1_init(u32 bound);
 void uart2_init(u32 bound);

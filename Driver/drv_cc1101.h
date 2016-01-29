@@ -22,11 +22,6 @@
  */
 u8 SPI_ExchangeByte(u8 input);
 
-#define SPI_GPIO_PORT		GPIOB
-#define GPIO_Pin_SO			GPIO_Pin_14
-#define GPIO_Pin_SCLK		GPIO_Pin_13
-#define GPIO_Pin_SI			GPIO_Pin_15
-
 #define CC_CSN_IO_PORT_CLK	RCC_APB2Periph_GPIOC
 #define READY_IO_PORT_CLK	RCC_APB2Periph_GPIOB
 #define INTERUPT_IO_PORT_CLK	RCC_APB2Periph_GPIOB
@@ -98,6 +93,9 @@ void CC1101WORInit(void);
 /*Initialize the CC1101, User can modify it*/
 void CC1101Init(void);
 
+void setCurrentMode(TRMODE mode);
+TRMODE getCurrentMode(void);
+u8 RecPacket(void);
 void cc1101_tx_test(void);
 void cc1101_rx_test(void);
 #endif /* DRV_CC1101_H_ */

@@ -10,8 +10,13 @@
 #include "delay.h"
 #include "usart.h"
 #include "string.h"
+#include "cc1101_exti.h"
 
 #define DEBUG
+
+TRMODE current_mode = RX_MODE;
+const u8 MAX_RECEIVE_SIZE = 64;
+u8 rec_buff[MAX_RECEIVE_SIZE];
 
 //10, 7, 5, 0, -5, -10, -15, -20, dbm output power, 0x12 == -30dbm
 u8 PaTabel[] = { 0xc0, 0xC8, 0x84, 0x60, 0x68, 0x34, 0x1D, 0x0E };
@@ -52,21 +57,6 @@ CC1101_FOCCFG, 0x16 }, { CC1101_WORCTRL, 0xFB }, {
 CC1101_FSCAL3, 0xE9 }, { CC1101_FSCAL2, 0x2A }, { CC1101_FSCAL1, 0x00 }, {
 CC1101_FSCAL0, 0x1F }, { CC1101_TEST2, 0x81 }, {
 CC1101_TEST1, 0x35 }, { CC1101_MCSM1, 0x3B }, };
-
-//static const u8 MyCC1101InitData[35][2] = { { CC1101_FSCTRL0, 0x00 }, {
-//CC1101_FSCTRL1, 0x08 }, { CC1101_FSCTRL0, 0x00 }, { CC1101_FREQ2, 0x10 }, {
-//CC1101_FREQ1, 0xA7 }, { CC1101_FREQ0, 0x62 }, { CC1101_MDMCFG4, 0x5B }, {
-//CC1101_MDMCFG3, 0xF8 }, {
-//CC1101_MDMCFG2, 0x03 }, { CC1101_MDMCFG1, 0x22 }, { CC1101_MDMCFG0, 0xF8 }, {
-//CC1101_CHANNR, 0x00 }, { CC1101_DEVIATN, 0x47 }, {
-//CC1101_FREND1, 0xB6 }, { CC1101_FREND0, 0x10 }, { CC1101_MCSM0, 0x18 }, {
-//CC1101_FOCCFG, 0x1D }, { CC1101_BSCFG, 0x1C }, {
-//CC1101_AGCCTRL2, 0xC7 }, { CC1101_AGCCTRL1, 0x00 }, { CC1101_AGCCTRL0, 0xB2 }, {
-//CC1101_FSCAL3, 0xEA }, { CC1101_FSCAL2, 0x2A }, { CC1101_FSCAL1, 0x00 }, {
-//CC1101_FSCAL0, 0x11 }, { CC1101_FSTEST, 0x59 }, { CC1101_TEST2, 0x81 }, {
-//CC1101_TEST1, 0x35 }, { CC1101_TEST0, 0x09 }, { CC1101_IOCFG2, 0x0B }, {
-//CC1101_IOCFG0, 0x06 }, { CC1101_PKTCTRL1, 0x05 }, { CC1101_PKTCTRL0, 0x05 }, {
-//CC1101_ADDR, 0x22 }, { CC1101_PKTLEN, 0x20 }, };
 
 /*read a byte from the specified register*/
 u8 GS_CC1101ReadReg(u8 addr);
@@ -191,6 +181,7 @@ void CC1101SetTRMode(TRMODE mode) {
 		CC1101WriteReg(CC1101_IOCFG0, 0x46);
 		CC1101WriteCmd( CC1101_SRX);
 	}
+	setCurrentMode(mode);
 }
 /*
  ================================================================================
@@ -324,7 +315,6 @@ void CC1101SendPacket(u8 *txbuffer, u8 size, TX_DATA_MODE mode) {
 		;
 	while (GPIO_ReadInputDataBit( INTERUPT_IO_PORT, INTERUPT_IO) == 0)
 		;
-
 	CC1101ClrTXBuff();
 }
 /*
@@ -446,6 +436,25 @@ void CC1101Init(void) {
 }
 
 /**
+ * @Description: 设置当前模块工作模式
+ * @param
+ * @return
+ * @author Sujunqin
+ */
+void setCurrentMode(TRMODE mode) {
+	current_mode = mode;
+}
+
+/**
+ * @Description: 获取当前模块工作模式
+ * @param
+ * @return
+ * @author Sujunqin
+ */
+TRMODE getCurrentMode() {
+	return current_mode;
+}
+/**
  * @Description: spi片选io初始化
  * @param
  * @return
@@ -472,30 +481,31 @@ void spi2_cs_io_init(void) {
 	GPIO_Init(INTERUPT_IO_PORT, &GPIO_InitStructure);
 }
 
-//*****************************************************************************************
-//函数名：void halRfSendPacket(INT8U *txBuffer, INT8U size)
-//输入：发送的缓冲区，发送数据个数
-//输出：无
-//功能描述：CC1100发送一组数据
-//*****************************************************************************************
-
-void halRfSendPacket(u8 *txBuffer, u8 size) {
-
-	//halSpiWriteReg(CCxxx0_TXFIFO, size); //写入长度
-	//halSpiWriteReg(CCxxx0_TXFIFO, 0x12);//写入接受地址
-
-	CC1101WriteMultiReg( CC1101_TXFIFO, txBuffer, size);
-
-//    halSpiStrobe(CCxxx0_STX);		//进入发送模式发送数据
-	CC1101WriteCmd( CC1101_STX);
-	// Wait for GDO0 to be set -> sync transmitted
-	while (!GPIO_ReadInputDataBit(READY_IO_PORT, READY_IO))
-		;	//while (!GDO0);
-	// Wait for GDO0 to be cleared -> end of packet
-	while (GPIO_ReadInputDataBit(READY_IO_PORT, READY_IO))
-		;    // while (GDO0);
-//	halSpiStrobe(CCxxx0_SFTX);
-	CC1101WriteCmd( CC1101_SFTX);
+/**
+ * @Description: 接收数据
+ * @param
+ * @return
+ * @author Sujunqin
+ */
+u8 RecPacket(void) {
+	u8 rxlen = 0;
+	u8 i;
+	CC1101SetTRMode(RX_MODE);
+	while (GPIO_ReadInputDataBit( INTERUPT_IO_PORT, INTERUPT_IO) != 0)
+		;
+	while (GPIO_ReadInputDataBit( INTERUPT_IO_PORT, INTERUPT_IO) == 0)
+		;
+	rxlen = CC1101RecPacket(rec_buff);
+	if (rxlen > 0) {
+#ifdef DEBUG
+		printf("rec_buff(%d):", rxlen);
+		for (i = 0; i < rxlen; ++i) {
+			printf("%c", rec_buff[i]);
+		}
+		printf("\r\n");
+#endif
+	}
+	return rxlen;
 }
 
 /**
@@ -555,6 +565,8 @@ void cc1101_rx_test(void) {
 	spi2_cs_io_init();
 	SPI2_Init();
 	CC1101Init();                        // Write RF settings to config reg
+	exti_init();
+
 	CC1101SetTRMode(RX_MODE);
 
 	while (1) {
@@ -578,7 +590,6 @@ void cc1101_rx_test(void) {
 			CC1101SendPacket(sendstring, strlen((const char*) sendstring),
 					ADDRESS_CHECK);
 #endif
-
 		}
 		LED1 = 1;
 		delay_ms(1000);
